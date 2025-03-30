@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime
+import pytz
 
 import schemas
 import models
@@ -32,6 +33,10 @@ router = APIRouter(
     prefix="/jobs",
     tags=["Jobs"]
 )
+
+def get_current_time_utc() -> datetime:
+    """Get current time in UTC"""
+    return datetime.now(pytz.UTC)
 
 @router.post("/", response_model=schemas.Job)
 def create_job(
@@ -124,26 +129,22 @@ def move_job_to_asset(
             logger.warning(f"Asset not found for move operation: ID={asset_id}")
             raise HTTPException(status_code=404, detail="Asset not found")
         
-        # Check current location
+        # Update departure time for current location if exists
         current_location = (
             db.query(models.JobLocation)
-            .filter(
-                models.JobLocation.job_id == job_id,
-                models.JobLocation.departure_time.is_(None)
-            )
+            .filter(models.JobLocation.job_id == job_id)
+            .order_by(models.JobLocation.arrival_time.desc())
             .first()
         )
         
-        # If job is currently at a location, set its departure time
-        if current_location:
-            logger.debug(f"Setting departure time for job ID={job_id} from asset ID={current_location.asset_id}")
-            current_location.departure_time = datetime.utcnow()
-        
+        if current_location and current_location.asset_id != asset_id:
+            current_location.departure_time = get_current_time_utc()
+            
         # Create new location record
         new_location = models.JobLocation(
             job_id=job_id,
             asset_id=asset_id,
-            arrival_time=datetime.utcnow()
+            arrival_time=get_current_time_utc()
         )
         db.add(new_location)
         
@@ -192,7 +193,7 @@ def update_job_status(
             )
             if current_location:
                 logger.debug(f"Setting departure time for completed job ID={job_id} from asset ID={current_location.asset_id}")
-                current_location.departure_time = datetime.utcnow()
+                current_location.departure_time = get_current_time_utc()
         
         # If marking as pending, ensure job is not at any location
         if status == models.JobStatus.PENDING:
@@ -206,7 +207,7 @@ def update_job_status(
             )
             if current_location:
                 logger.debug(f"Setting departure time for pending job ID={job_id} from asset ID={current_location.asset_id}")
-                current_location.departure_time = datetime.utcnow()
+                current_location.departure_time = get_current_time_utc()
         
         job.status = status
         db.commit()

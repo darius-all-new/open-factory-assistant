@@ -49,9 +49,9 @@ create_initial_user() {
     echo -e "\n${CYAN}Let's create your initial user${NC}"
     read -p "Enter username: " username
     read -p "Enter email: " email
-    read -s -p "Enter password: " password
+    read -s -p "Enter password (minimum 8 characters): " password
     echo
-    read -s -p "Confirm password: " password2
+    read -s -p "Confirm password (minimum 8 characters): " password2
     echo
 
     if [ "$password" != "$password2" ]; then
@@ -59,22 +59,29 @@ create_initial_user() {
         return 1
     fi
 
+    echo -e "${CYAN}Creating user ($backend_url)...${NC}"
+
     # Create JSON payload
     json_data="{\"username\":\"$username\",\"email\":\"$email\",\"password\":\"$password\"}"
 
     # Make API request
-    response=$(curl -s -X POST "$backend_url/users/register" \
+    response=$(curl -s -k -X POST "$backend_url/users/register" \
         -H "Content-Type: application/json" \
         -d "$json_data")
 
-    if [ $? -eq 0 ]; then
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Failed to connect to backend!${NC}"
+        return 1
+    fi
+
+    if [ "$response" -eq 200 ]; then
         echo -e "${GREEN}User created successfully!${NC}"
         echo -e "${GREEN}You can now log in with your username and password.${NC}"
         return 0
-    else
-        echo -e "${RED}Failed to create user: $response${NC}"
-        return 1
-    fi
+else
+    echo -e "${RED}Failed to create user. HTTP status: $response${NC}"
+    return 1
+fi
 }
 
 # Function to open a new terminal window and run a command
@@ -213,6 +220,7 @@ done
 
 # Get local IP address
 local_ip=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -n 1)
+echo -e "Local IP address: $local_ip"
 if [ -z "$local_ip" ]; then
     local_ip="localhost"
 fi

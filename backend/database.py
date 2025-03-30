@@ -17,18 +17,34 @@ You should have received a copy of the GNU General Public License
 along with OpenFactoryAssistant. If not, see <https://www.gnu.org/licenses/>
 '''
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, engine_from_config
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from pathlib import Path
+import os
 
 # Use pathlib for cross-platform compatibility
-DB_FILE = Path("app.db").absolute()
-SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_FILE}"
+# DB_FILE = Path("app.db").absolute()
+# SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_FILE}"
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./app.db")
+
+# SQLite-specific connect args
+connect_args = {"check_same_thread": False} if SQLALCHEMY_DATABASE_URL.startswith("sqlite") else {}
+
+# Add timezone support for non-SQLite databases
+if not SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
+    connect_args["timezone"] = True
 
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    SQLALCHEMY_DATABASE_URL, 
+    connect_args=connect_args,
+    json_serializer=lambda obj: obj,
+    pool_pre_ping=True,
+    pool_recycle=300,
+    pool_size=5,
+    max_overflow=10,
+    echo=False
 )
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

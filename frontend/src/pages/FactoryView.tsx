@@ -91,11 +91,27 @@ export const FactoryView = () => {
   const GRID_GAP = 40;
   const ARROW_SIZE = 25;
   const ARROW_SPACING = 100;
-  const JOB_HISTORY_INTERVAL = 30000; // 30 seconds
+  const JOB_HISTORY_INTERVAL = 5000; // 5 seconds
   const PATH_WIDTH = 4;
   const PATH_COLOR = "#ffffff";
   const ARRIVAL_PATH_COLOR = "#1bb1cf"; // Blue color for arrival path
   const COMPLETION_PATH_COLOR = "#4caf50"; // Green color for completion path
+
+  // Parse timestamps with proper timezone handling
+  const parseTimestamp = (timestamp: string | null): Date => {
+    if (!timestamp) return new Date();
+
+    // Parse the ISO timestamp (which is in UTC) and convert to local time
+    const date = new Date(timestamp);
+
+    // If timestamp doesn't have timezone info (Z or +/-), assume UTC
+    if (!timestamp.endsWith("Z") && !timestamp.match(/[+-]\d{2}:?\d{2}$/)) {
+      console.warn(`Timestamp ${timestamp} has no timezone info, assuming UTC`);
+      return new Date(timestamp + "Z");
+    }
+
+    return date;
+  };
 
   // Handle station jobs click
   const handleStationJobsClick = useCallback(
@@ -325,6 +341,72 @@ export const FactoryView = () => {
     }, 5000);
   }, []);
 
+  // Function to compare job locations and detect moves
+  const checkForNewMoves = useCallback(
+    async (newJobs: Job[], oldJobs: Job[]) => {
+      if (!token) return;
+
+      for (const newJob of newJobs) {
+        const oldJob = oldJobs.find((j) => j.id === newJob.id);
+        if (!oldJob) continue;
+
+        // Check if the location has changed
+        if (
+          newJob.current_location?.asset_id !==
+          oldJob.current_location?.asset_id
+        ) {
+          const station = stations.find(
+            (s) => s.id === newJob.current_location?.asset_id
+          );
+          if (station) {
+            handleNewMove(newJob.name, station.name);
+
+            // Select the job that just moved and show its history
+            setSelectedJob(newJob);
+            const history = await getJobHistory(newJob.id, token);
+            if (history) {
+              setJobHistory(history);
+              // Set current step to show the latest move
+              setCurrentStep(Math.max(0, history.length - 2));
+            }
+          }
+        }
+      }
+    },
+    [
+      token,
+      stations,
+      handleNewMove,
+      setSelectedJob,
+      setJobHistory,
+      setCurrentStep,
+    ]
+  );
+
+  // Fetch jobs with move detection
+  useEffect(() => {
+    const fetchJobs = async () => {
+      if (!token) return;
+
+      try {
+        const fetchedJobs = await getJobs(token);
+        // Check for new moves before updating the jobs state
+        await checkForNewMoves(fetchedJobs, jobs);
+        setJobs(fetchedJobs);
+      } catch (err) {
+        console.error("Error fetching jobs:", err);
+      }
+    };
+
+    fetchJobs();
+
+    // Set up polling interval if live mode is enabled
+    if (isLive) {
+      const interval = setInterval(fetchJobs, JOB_HISTORY_INTERVAL);
+      return () => clearInterval(interval);
+    }
+  }, [token, isLive, checkForNewMoves, jobs]);
+
   // Render stations
   const renderStations = useCallback(() => {
     return stations.map((station) => {
@@ -451,7 +533,7 @@ export const FactoryView = () => {
         const history = await getJobHistory(job.id, token);
         if (history && history.length > 0) {
           const lastMove = history[history.length - 1];
-          const moveTime = new Date(lastMove.arrival_time);
+          const moveTime = parseTimestamp(lastMove.arrival_time);
           if (moveTime > latestTime) {
             latestTime = moveTime;
             latestJob = job;
@@ -676,7 +758,7 @@ export const FactoryView = () => {
           history[0].asset.name
         }\nTime: ${
           history[0].arrival_time
-            ? format(new Date(history[0].arrival_time), "MMM d, HH:mm")
+            ? format(parseTimestamp(history[0].arrival_time), "MMM d, HH:mm")
             : ""
         }`;
 
@@ -722,7 +804,10 @@ export const FactoryView = () => {
           history[step + 1].asset.name
         }\nTime: ${
           history[step + 1].arrival_time
-            ? format(new Date(history[step + 1].arrival_time), "MMM d, HH:mm")
+            ? format(
+                parseTimestamp(history[step + 1].arrival_time),
+                "MMM d, HH:mm"
+              )
             : ""
         }`;
 
@@ -759,7 +844,7 @@ export const FactoryView = () => {
 
           const departureTime = jobHistory?.[step + 1]?.departure_time;
           const formattedTime = departureTime
-            ? format(new Date(departureTime as string), "MMM d, HH:mm")
+            ? format(parseTimestamp(departureTime as string), "MMM d, HH:mm")
             : "";
           const completionTooltip = `Job Completed\nTime: ${formattedTime}`;
 
@@ -873,7 +958,7 @@ export const FactoryView = () => {
   const isJobOverdue = useCallback((job: Job) => {
     return (
       job.due_date &&
-      new Date(job.due_date) < new Date() &&
+      parseTimestamp(job.due_date) < new Date() &&
       job.status !== "complete"
     );
   }, []);
@@ -951,362 +1036,410 @@ export const FactoryView = () => {
   return (
     <Box
       sx={{
-        p: 3,
-        width: "100%",
-        height: "100vh",
+        height: "100%",
         display: "flex",
         flexDirection: "column",
+        position: "relative",
+        overflow: "hidden",
+        ...(showMoveHighlight && {
+          "& > *:first-of-type": {
+            boxShadow: `0 0 0 4px ${theme.palette.success.main}`,
+          },
+        }),
       }}
     >
-      <Box sx={{ mb: 2, display: "flex", alignItems: "center", gap: 2 }}>
-        <Typography
-          variant="h4"
-          sx={{ fontWeight: "bold", color: theme.palette.primary.main }}
-        >
-          Factory View
-        </Typography>
-        <Box sx={{ flex: 1 }} />
-        <Button
-          variant="contained"
-          onClick={toggleLive}
-          sx={{
-            bgcolor: isLive ? "success.main" : "background.paper",
-            color: isLive ? "success.contrastText" : "text.secondary",
-            border: "1px solid",
-            borderColor: isLive ? "success.main" : "divider",
-            "&:hover": {
-              bgcolor: isLive ? "success.dark" : "action.hover",
-            },
-            transition: "all 0.3s ease",
-            minWidth: 100,
-            fontWeight: "medium",
-          }}
-          startIcon={
-            <LiveIcon
-              sx={{
-                animation: isLive ? "pulse 2s infinite" : "none",
-                "@keyframes pulse": {
-                  "0%": { opacity: 1 },
-                  "50%": { opacity: 0.5 },
-                  "100%": { opacity: 1 },
-                },
-              }}
-            />
-          }
-        >
-          LIVE
-        </Button>
-        <Tooltip title="Show Latest Move">
-          <IconButton onClick={refreshData}>
-            <Update />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Zoom Out">
-          <IconButton onClick={() => handleZoom(scale - SCALE_STEP)}>
-            <ZoomOut />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Zoom In">
-          <IconButton onClick={() => handleZoom(scale + SCALE_STEP)}>
-            <ZoomIn />
-          </IconButton>
-        </Tooltip>
-
-        <Tooltip title="Reset View">
-          <IconButton
-            onClick={() => {
-              handlePan({ x: 0, y: 0 });
-              handleZoom(1);
-            }}
-          >
-            <RestartAlt />
-          </IconButton>
-        </Tooltip>
-
-        <Tooltip title="Default station layout">
-          <IconButton onClick={handleLayoutDialogOpen}>
-            <GridView />
-          </IconButton>
-        </Tooltip>
-      </Box>
-
-      {/* Layout Dialog */}
-      <Dialog
-        open={isLayoutDialogOpen}
-        onClose={() => setIsLayoutDialogOpen(false)}
-      >
-        <DialogTitle>Layout Options</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Would you like to reset the layout to the default grid pattern?
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setIsLayoutDialogOpen(false)}>Cancel</Button>
-          <Button
-            onClick={() => {
-              applyDefaultLayout();
-              setIsLayoutDialogOpen(false);
-            }}
-            variant="contained"
-          >
-            Reset Layout
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Job History Banner - Always visible */}
-      <Paper
+      <Box
         sx={{
-          p: 2,
-          mb: 2,
+          p: 3,
+          width: "100%",
+          height: "100vh",
           display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          bgcolor: "background.paper",
-          color: "text.primary",
-          minHeight: "160px", // Set minimum height to prevent jumping
+          flexDirection: "column",
         }}
       >
-        {selectedJob ? (
-          selectedJob.status === "pending" ? (
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="subtitle1" sx={{ mb: 1 }}>
-                Job History: {selectedJob.name}
-              </Typography>
-              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                This job is pending and hasn't started yet. No history is
-                available until the job is moved to its first station.
-              </Typography>
-            </Box>
-          ) : jobHistory && jobHistory.length > 0 ? (
-            <>
+        <Box sx={{ mb: 2, display: "flex", alignItems: "center", gap: 2 }}>
+          <Typography
+            variant="h4"
+            sx={{ fontWeight: "bold", color: theme.palette.primary.main }}
+          >
+            Factory View
+          </Typography>
+          <Box sx={{ flex: 1 }} />
+          <Button
+            variant="contained"
+            onClick={toggleLive}
+            sx={{
+              bgcolor: isLive ? "success.main" : "background.paper",
+              color: isLive ? "success.contrastText" : "text.secondary",
+              border: "1px solid",
+              borderColor: isLive ? "success.main" : "divider",
+              "&:hover": {
+                bgcolor: isLive ? "success.dark" : "action.hover",
+              },
+              transition: "all 0.3s ease",
+              minWidth: 100,
+              fontWeight: "medium",
+            }}
+            startIcon={
+              <LiveIcon
+                sx={{
+                  animation: isLive ? "pulse 2s infinite" : "none",
+                  "@keyframes pulse": {
+                    "0%": { opacity: 1 },
+                    "50%": { opacity: 0.5 },
+                    "100%": { opacity: 1 },
+                  },
+                }}
+              />
+            }
+          >
+            LIVE
+          </Button>
+          <Tooltip title="Show Latest Move">
+            <IconButton onClick={refreshData}>
+              <Update />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Zoom Out">
+            <IconButton onClick={() => handleZoom(scale - SCALE_STEP)}>
+              <ZoomOut />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Zoom In">
+            <IconButton onClick={() => handleZoom(scale + SCALE_STEP)}>
+              <ZoomIn />
+            </IconButton>
+          </Tooltip>
+
+          <Tooltip title="Reset View">
+            <IconButton
+              onClick={() => {
+                handlePan({ x: 0, y: 0 });
+                handleZoom(1);
+              }}
+            >
+              <RestartAlt />
+            </IconButton>
+          </Tooltip>
+
+          <Tooltip title="Default station layout">
+            <IconButton onClick={handleLayoutDialogOpen}>
+              <GridView />
+            </IconButton>
+          </Tooltip>
+        </Box>
+
+        {/* Layout Dialog */}
+        <Dialog
+          open={isLayoutDialogOpen}
+          onClose={() => setIsLayoutDialogOpen(false)}
+        >
+          <DialogTitle>Layout Options</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Would you like to reset the layout to the default grid pattern?
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setIsLayoutDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                applyDefaultLayout();
+                setIsLayoutDialogOpen(false);
+              }}
+              variant="contained"
+            >
+              Reset Layout
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Job History Banner - Always visible */}
+        <Paper
+          sx={{
+            p: 2,
+            mb: 2,
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            bgcolor: "background.paper",
+            color: "text.primary",
+            minHeight: "160px", // Set minimum height to prevent jumping
+          }}
+        >
+          {selectedJob ? (
+            selectedJob.status === "pending" ? (
               <Box sx={{ flex: 1 }}>
                 <Typography variant="subtitle1" sx={{ mb: 1 }}>
                   Job History: {selectedJob.name}
                 </Typography>
-                {jobHistory.length > 1 ? (
-                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                    Step {currentStep + 1} of {jobHistory.length - 1}
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                  This job is pending and hasn't started yet. No history is
+                  available until the job is moved to its first station.
+                </Typography>
+              </Box>
+            ) : jobHistory && jobHistory.length > 0 ? (
+              <>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                    Job History: {selectedJob.name}
                   </Typography>
-                ) : (
-                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                    Job is in its first station (no history steps available)
-                  </Typography>
-                )}
-                <Box sx={{ mt: 1 }}>
-                  {jobHistory[currentStep]?.asset ? (
-                    <>
-                      <Typography
-                        variant="body2"
-                        sx={{ color: "text.secondary" }}
-                      >
-                        {/* If it's the first and only step, just show current location */}
-                        {jobHistory.length === 1 ? (
-                          <>
-                            Current Location:{" "}
-                            {jobHistory[currentStep].asset.name}
-                          </>
-                        ) : (
-                          <>
-                            {jobHistory[currentStep].asset.name}
-                            {jobHistory[currentStep + 1]?.asset && (
-                              <> → {jobHistory[currentStep + 1].asset.name}</>
-                            )}
-                          </>
-                        )}
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        sx={{ color: "text.secondary", mt: 0.5 }}
-                      >
-                        {currentStep === 0 ? (
-                          // Show initial arrival time for first step
-                          <>
-                            Started:{" "}
-                            {jobHistory[0].arrival_time
-                              ? format(
-                                  new Date(jobHistory[0].arrival_time),
-                                  "MMM d, HH:mm"
-                                )
-                              : ""}
-                            {jobHistory[1]?.arrival_time && (
-                              <>
-                                <br />
-                                Moved:{" "}
-                                {jobHistory[1].arrival_time
-                                  ? format(
-                                      new Date(jobHistory[1].arrival_time),
-                                      "MMM d, HH:mm"
-                                    )
-                                  : ""}
-                              </>
-                            )}
-                          </>
-                        ) : currentStep === jobHistory.length - 2 &&
-                          selectedJob?.status === "complete" ? (
-                          // Show completion time for last step of completed job
-                          <>
-                            {jobHistory[currentStep + 1]?.arrival_time && (
-                              <>
-                                Moved:{" "}
-                                {format(
-                                  new Date(
-                                    jobHistory[currentStep + 1].arrival_time
-                                  ),
-                                  "MMM d, HH:mm"
-                                )}
-                              </>
-                            )}
-                            {jobHistory[currentStep + 1]?.departure_time && (
-                              <>
-                                <br />
-                                Completed:{" "}
-                                {format(
-                                  new Date(
-                                    jobHistory[currentStep + 1]
-                                      .departure_time as string
-                                  ),
-                                  "MMM d, HH:mm"
-                                )}
-                              </>
-                            )}
-                          </>
-                        ) : (
-                          // Show move time for intermediate steps
-                          <>
-                            {jobHistory[currentStep + 1]?.arrival_time && (
-                              <>
-                                Moved:{" "}
-                                {jobHistory[currentStep + 1].arrival_time
-                                  ? format(
-                                      new Date(
-                                        jobHistory[currentStep + 1].arrival_time
-                                      ),
-                                      "MMM d, HH:mm"
-                                    )
-                                  : ""}
-                              </>
-                            )}
-                          </>
-                        )}
-                      </Typography>
-                    </>
+                  {jobHistory.length > 1 ? (
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "text.secondary" }}
+                    >
+                      Step {currentStep + 1} of {jobHistory.length - 1}
+                    </Typography>
                   ) : (
                     <Typography
                       variant="body2"
                       sx={{ color: "text.secondary" }}
                     >
-                      Loading job history...
+                      Job is in its first station (no history steps available)
                     </Typography>
                   )}
+                  <Box sx={{ mt: 1 }}>
+                    {jobHistory[currentStep]?.asset ? (
+                      <>
+                        <Typography
+                          variant="body2"
+                          sx={{ color: "text.secondary" }}
+                        >
+                          {/* If it's the first and only step, just show current location */}
+                          {jobHistory.length === 1 ? (
+                            <>
+                              Current Location:{" "}
+                              {jobHistory[currentStep].asset.name}
+                            </>
+                          ) : (
+                            <>
+                              {jobHistory[currentStep].asset.name}
+                              {jobHistory[currentStep + 1]?.asset && (
+                                <> → {jobHistory[currentStep + 1].asset.name}</>
+                              )}
+                            </>
+                          )}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{ color: "text.secondary", mt: 0.5 }}
+                        >
+                          {currentStep === 0 ? (
+                            // Show initial arrival time for first step
+                            <>
+                              Started:{" "}
+                              {jobHistory[0].arrival_time
+                                ? format(
+                                    parseTimestamp(jobHistory[0].arrival_time),
+                                    "MMM d, HH:mm"
+                                  )
+                                : ""}
+                              {jobHistory[1]?.arrival_time && (
+                                <>
+                                  <br />
+                                  Moved:{" "}
+                                  {jobHistory[1].arrival_time
+                                    ? format(
+                                        parseTimestamp(
+                                          jobHistory[1].arrival_time
+                                        ),
+                                        "MMM d, HH:mm"
+                                      )
+                                    : ""}
+                                </>
+                              )}
+                            </>
+                          ) : currentStep === jobHistory.length - 2 &&
+                            selectedJob?.status === "complete" ? (
+                            // Show completion time for last step of completed job
+                            <>
+                              {jobHistory[currentStep + 1]?.arrival_time && (
+                                <>
+                                  Moved:{" "}
+                                  {format(
+                                    parseTimestamp(
+                                      jobHistory[currentStep + 1].arrival_time
+                                    ),
+                                    "MMM d, HH:mm"
+                                  )}
+                                </>
+                              )}
+                              {jobHistory[currentStep + 1]?.departure_time && (
+                                <>
+                                  <br />
+                                  Completed:{" "}
+                                  {format(
+                                    parseTimestamp(
+                                      jobHistory[currentStep + 1]
+                                        .departure_time as string
+                                    ),
+                                    "MMM d, HH:mm"
+                                  )}
+                                </>
+                              )}
+                            </>
+                          ) : (
+                            // Show move time for intermediate steps
+                            <>
+                              {jobHistory[currentStep + 1]?.arrival_time && (
+                                <>
+                                  Moved:{" "}
+                                  {jobHistory[currentStep + 1].arrival_time
+                                    ? format(
+                                        parseTimestamp(
+                                          jobHistory[currentStep + 1]
+                                            .arrival_time
+                                        ),
+                                        "MMM d, HH:mm"
+                                      )
+                                    : ""}
+                                </>
+                              )}
+                            </>
+                          )}
+                        </Typography>
+                      </>
+                    ) : (
+                      <Typography
+                        variant="body2"
+                        sx={{ color: "text.secondary" }}
+                      >
+                        Loading job history...
+                      </Typography>
+                    )}
+                  </Box>
                 </Box>
-              </Box>
-              <Box
-                sx={{
-                  flex: 2,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  px: 2,
-                  maxHeight: 120, // Allow for up to 3 rows
-                  overflow: "auto",
-                }}
-              >
                 <Box
                   sx={{
+                    flex: 2,
                     display: "flex",
-                    flexWrap: "wrap",
-                    gap: 1,
-                    justifyContent: "center",
                     alignItems: "center",
-                    maxWidth: "100%",
+                    justifyContent: "center",
+                    px: 2,
+                    maxHeight: 120, // Allow for up to 3 rows
+                    overflow: "auto",
                   }}
                 >
-                  {jobHistory.slice(0, -1).map((_, index) => (
-                    <Box
-                      key={index}
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                      }}
-                    >
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 1,
+                      justifyContent: "center",
+                      alignItems: "center",
+                      maxWidth: "100%",
+                    }}
+                  >
+                    {jobHistory.slice(0, -1).map((_, index) => (
                       <Box
-                        onClick={() => setCurrentStep(index)}
+                        key={index}
                         sx={{
-                          width: 24,
-                          height: 24,
-                          borderRadius: "50%",
-                          bgcolor:
-                            index === currentStep
-                              ? "primary.main"
-                              : "action.selected",
-                          color:
-                            index === currentStep
-                              ? "primary.contrastText"
-                              : "text.primary",
                           display: "flex",
                           alignItems: "center",
-                          justifyContent: "center",
-                          cursor: "pointer",
-                          transition: "all 0.2s",
-                          "&:hover": {
-                            bgcolor:
-                              index === currentStep
-                                ? "primary.dark"
-                                : "action.hover",
-                          },
-                          fontSize: "0.875rem",
                         }}
                       >
-                        {index + 1}
-                      </Box>
-                      {index < jobHistory.length - 2 && (
                         <Box
+                          onClick={() => setCurrentStep(index)}
                           sx={{
-                            width: 16,
-                            height: 2,
-                            bgcolor: "action.selected",
-                            mx: 1,
+                            width: 24,
+                            height: 24,
+                            borderRadius: "50%",
+                            bgcolor:
+                              index === currentStep
+                                ? "primary.main"
+                                : "action.selected",
+                            color:
+                              index === currentStep
+                                ? "primary.contrastText"
+                                : "text.primary",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            cursor: "pointer",
+                            transition: "all 0.2s",
+                            "&:hover": {
+                              bgcolor:
+                                index === currentStep
+                                  ? "primary.dark"
+                                  : "action.hover",
+                            },
+                            fontSize: "0.875rem",
                           }}
-                        />
-                      )}
-                    </Box>
-                  ))}
+                        >
+                          {index + 1}
+                        </Box>
+                        {index < jobHistory.length - 2 && (
+                          <Box
+                            sx={{
+                              width: 16,
+                              height: 2,
+                              bgcolor: "action.selected",
+                              mx: 1,
+                            }}
+                          />
+                        )}
+                      </Box>
+                    ))}
+                  </Box>
                 </Box>
-              </Box>
+                <Box
+                  sx={{
+                    flex: 1,
+                    display: "flex",
+                    gap: 1,
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  <IconButton
+                    onClick={() =>
+                      setCurrentStep((prev) => Math.max(0, prev - 1))
+                    }
+                    disabled={currentStep === 0}
+                    size="small"
+                    sx={{ color: "text.primary" }}
+                  >
+                    <NavigateBefore />
+                  </IconButton>
+                  <IconButton
+                    onClick={() =>
+                      setCurrentStep((prev) =>
+                        Math.min(jobHistory.length - 2, prev + 1)
+                      )
+                    }
+                    disabled={currentStep >= jobHistory.length - 2}
+                    size="small"
+                    sx={{ color: "text.primary" }}
+                  >
+                    <NavigateNext />
+                  </IconButton>
+                </Box>
+              </>
+            ) : (
+              // Placeholder content when no job is selected
               <Box
                 sx={{
-                  flex: 1,
+                  width: "100%",
                   display: "flex",
-                  gap: 1,
-                  justifyContent: "flex-end",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
                 }}
               >
-                <IconButton
-                  onClick={() =>
-                    setCurrentStep((prev) => Math.max(0, prev - 1))
-                  }
-                  disabled={currentStep === 0}
-                  size="small"
-                  sx={{ color: "text.primary" }}
+                <Typography
+                  variant="subtitle1"
+                  sx={{ color: "text.secondary" }}
                 >
-                  <NavigateBefore />
-                </IconButton>
-                <IconButton
-                  onClick={() =>
-                    setCurrentStep((prev) =>
-                      Math.min(jobHistory.length - 2, prev + 1)
-                    )
-                  }
-                  disabled={currentStep >= jobHistory.length - 2}
-                  size="small"
-                  sx={{ color: "text.primary" }}
+                  Select a job to view its history
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{ color: "text.disabled", mt: 1 }}
                 >
-                  <NavigateNext />
-                </IconButton>
+                  The job's movement through the factory will be displayed here
+                </Typography>
               </Box>
-            </>
+            )
           ) : (
             // Placeholder content when no job is selected
             <Box
@@ -1328,269 +1461,240 @@ export const FactoryView = () => {
                 The job's movement through the factory will be displayed here
               </Typography>
             </Box>
-          )
-        ) : (
-          // Placeholder content when no job is selected
-          <Box
-            sx={{
-              width: "100%",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Typography variant="subtitle1" sx={{ color: "text.secondary" }}>
-              Select a job to view its history
-            </Typography>
-            <Typography variant="body2" sx={{ color: "text.disabled", mt: 1 }}>
-              The job's movement through the factory will be displayed here
-            </Typography>
-          </Box>
-        )}
-      </Paper>
-
-      <Box sx={{ display: "flex", gap: 2, flex: 1, minHeight: 0 }}>
-        {/* Jobs Panel */}
-        <Paper
-          elevation={1}
-          sx={{
-            width: 300,
-            p: 2,
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-          }}
-        >
-          <Typography variant="h6" sx={{ mb: 2 }}>
-            Jobs
-          </Typography>
-
-          {/* Search and Filters */}
-          <Box sx={{ mb: 2 }}>
-            <TextField
-              fullWidth
-              size="small"
-              placeholder="Search jobs..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <SearchIcon sx={{ mr: 1, color: "action.active" }} />
-                ),
-              }}
-              sx={{ mb: 1 }}
-            />
-            <ToggleButtonGroup
-              value={statusFilter}
-              onChange={handleStatusFilterChange}
-              aria-label="job status filter"
-              size="small"
-              sx={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 1,
-                "& .MuiToggleButton-root": {
-                  flex: "1 1 calc(50% - 4px)",
-                  minWidth: 0,
-                  textTransform: "none",
-                  py: 0.5,
-                  border: "1px solid",
-                  borderColor: "divider",
-                  borderRadius: "4px !important",
-                  "&.Mui-selected": {
-                    backgroundColor: "primary.main",
-                    color: "primary.contrastText",
-                    "&:hover": {
-                      backgroundColor: "primary.dark",
-                    },
-                  },
-                  "&:hover": {
-                    backgroundColor: "action.hover",
-                  },
-                },
-              }}
-              exclusive={false}
-            >
-              <ToggleButton value="in_progress" aria-label="in progress">
-                In Progress
-              </ToggleButton>
-              <ToggleButton value="complete" aria-label="completed">
-                Completed
-              </ToggleButton>
-              <ToggleButton value="pending" aria-label="pending">
-                Pending
-              </ToggleButton>
-              <ToggleButton value="overdue" aria-label="overdue">
-                Overdue
-              </ToggleButton>
-            </ToggleButtonGroup>
-          </Box>
-
-          <List sx={{ overflow: "auto", flex: 1 }}>
-            {filteredJobs.map((job) => (
-              <ListItem
-                key={job.id}
-                sx={{
-                  "&:hover": {
-                    backgroundColor: "action.hover",
-                  },
-                  backgroundColor:
-                    selectedJob?.id === job.id
-                      ? "action.selected"
-                      : "transparent",
-                  cursor: "pointer",
-                  borderRadius: 1,
-                  mb: 0.5,
-                }}
-                onClick={() =>
-                  handleJobSelect(job.id === selectedJob?.id ? null : job)
-                }
-              >
-                <ListItemText
-                  primary={
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      {job.name}
-                      {isJobOverdue(job) && (
-                        <Chip
-                          label="Overdue"
-                          size="small"
-                          color="error"
-                          icon={<WarningIcon />}
-                          sx={{ height: 24 }}
-                        />
-                      )}
-                    </Box>
-                  }
-                  secondary={`Status: ${job.status}`}
-                />
-              </ListItem>
-            ))}
-          </List>
+          )}
         </Paper>
 
-        <Box
-          id="factory-view"
-          sx={{
-            flex: 1,
-            position: "relative",
-            overflow: "hidden",
-            bgcolor: theme.palette.mode === "dark" ? "grey.900" : "grey.100",
-            borderRadius: 1,
-            border: showMoveHighlight ? "2px solid" : "1px solid",
-            borderColor: showMoveHighlight ? "success.main" : "divider",
-            transition: "all 0.3s ease",
-          }}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-        >
-          <Box
+        <Box sx={{ display: "flex", gap: 2, flex: 1, minHeight: 0 }}>
+          {/* Jobs Panel */}
+          <Paper
+            elevation={1}
             sx={{
-              position: "absolute",
-              transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
-              transformOrigin: "0 0",
-              width: "100%",
-              height: "100%",
+              width: 300,
+              p: 2,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
             }}
           >
-            <svg
-              width="100%"
-              height="100%"
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                pointerEvents: "none",
-                minWidth: "2000px",
-                minHeight: "1000px",
-                overflow: "visible",
-              }}
-              preserveAspectRatio="none"
-            >
-              {selectedJob &&
-                jobHistory &&
-                generatePath(jobHistory, currentStep)}
-            </svg>
-            {renderStations()}
-          </Box>
-        </Box>
-      </Box>
-
-      <Drawer
-        anchor="left"
-        open={isJobsDrawerOpen}
-        onClose={handleCloseJobsDrawer}
-        PaperProps={{
-          sx: { width: 300 },
-        }}
-      >
-        <Box sx={{ p: 2 }}>
-          <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>
-            <Typography variant="h6">
-              {selectedStation ? `${selectedStation.name} Jobs` : "Jobs"}
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              Jobs
             </Typography>
-            <IconButton onClick={handleCloseJobsDrawer}>
-              <CloseIcon />
-            </IconButton>
-          </Box>
-          <List>
-            {selectedStationJobs.map((job) => (
-              <ListItem
-                key={job.id}
-                sx={{
-                  "&:hover": {
-                    backgroundColor: "action.hover",
-                  },
-                  backgroundColor:
-                    selectedJob?.id === job.id
-                      ? "action.selected"
-                      : "transparent",
-                  cursor: "pointer",
-                  borderRadius: 1,
-                  mb: 0.5,
-                }}
-                onClick={() =>
-                  handleJobSelect(job.id === selectedJob?.id ? null : job)
-                }
-              >
-                <ListItemText
-                  primary={job.name}
-                  secondary={`Status: ${job.status}`}
-                />
-              </ListItem>
-            ))}
-          </List>
-        </Box>
-      </Drawer>
 
-      {/* Move Notification */}
-      <Snackbar
-        open={showMoveHighlight}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-        sx={{
-          mt: 7, // Offset to avoid overlapping with the header
-          left: "50% !important",
-          transform: "translateX(-50%)",
-        }}
-      >
-        <Alert
-          severity="info"
-          sx={{
-            width: "100%",
-            minWidth: 300,
-            bgcolor: "success.light",
-            color: "success.contrastText",
-            "& .MuiAlert-icon": {
-              color: "success.contrastText",
-            },
+            {/* Search and Filters */}
+            <Box sx={{ mb: 2 }}>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Search jobs..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <SearchIcon sx={{ mr: 1, color: "action.active" }} />
+                  ),
+                }}
+                sx={{ mb: 1 }}
+              />
+              <ToggleButtonGroup
+                value={statusFilter}
+                onChange={handleStatusFilterChange}
+                aria-label="job status filter"
+                size="small"
+                sx={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 1,
+                  "& .MuiToggleButton-root": {
+                    flex: "1 1 calc(50% - 4px)",
+                    minWidth: 0,
+                    textTransform: "none",
+                    py: 0.5,
+                    border: "1px solid",
+                    borderColor: "divider",
+                    borderRadius: "4px !important",
+                    "&.Mui-selected": {
+                      backgroundColor: "primary.main",
+                      color: "primary.contrastText",
+                      "&:hover": {
+                        backgroundColor: "primary.dark",
+                      },
+                    },
+                    "&:hover": {
+                      backgroundColor: "action.hover",
+                    },
+                  },
+                }}
+                exclusive={false}
+              >
+                <ToggleButton value="in_progress" aria-label="in progress">
+                  In Progress
+                </ToggleButton>
+                <ToggleButton value="complete" aria-label="completed">
+                  Completed
+                </ToggleButton>
+                <ToggleButton value="pending" aria-label="pending">
+                  Pending
+                </ToggleButton>
+                <ToggleButton value="overdue" aria-label="overdue">
+                  Overdue
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
+
+            <List sx={{ overflow: "auto", flex: 1 }}>
+              {filteredJobs.map((job) => (
+                <ListItem
+                  key={job.id}
+                  sx={{
+                    "&:hover": {
+                      backgroundColor: "action.hover",
+                    },
+                    backgroundColor:
+                      selectedJob?.id === job.id
+                        ? "action.selected"
+                        : "transparent",
+                    cursor: "pointer",
+                    borderRadius: 1,
+                    mb: 0.5,
+                  }}
+                  onClick={() =>
+                    handleJobSelect(job.id === selectedJob?.id ? null : job)
+                  }
+                >
+                  <ListItemText
+                    primary={
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        {job.name}
+                        {isJobOverdue(job) && (
+                          <Chip
+                            label="Overdue"
+                            size="small"
+                            color="error"
+                            icon={<WarningIcon />}
+                            sx={{ height: 24 }}
+                          />
+                        )}
+                      </Box>
+                    }
+                    secondary={`Status: ${job.status}`}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          </Paper>
+
+          <Box
+            id="factory-view"
+            sx={{
+              flex: 1,
+              position: "relative",
+              overflow: "hidden",
+              bgcolor: theme.palette.mode === "dark" ? "grey.900" : "grey.100",
+              borderRadius: 1,
+              border: showMoveHighlight ? "2px solid" : "1px solid",
+              borderColor: showMoveHighlight ? "success.main" : "divider",
+              transition: "all 0.3s ease",
+            }}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+          >
+            <Box
+              sx={{
+                position: "absolute",
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
+                transformOrigin: "0 0",
+                width: "100%",
+                height: "100%",
+              }}
+            >
+              <svg
+                width="100%"
+                height="100%"
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  pointerEvents: "none",
+                  minWidth: "2000px",
+                  minHeight: "1000px",
+                  overflow: "visible",
+                }}
+                preserveAspectRatio="none"
+              >
+                {selectedJob &&
+                  jobHistory &&
+                  generatePath(jobHistory, currentStep)}
+              </svg>
+              {renderStations()}
+            </Box>
+          </Box>
+        </Box>
+
+        <Drawer
+          anchor="left"
+          open={isJobsDrawerOpen}
+          onClose={handleCloseJobsDrawer}
+          PaperProps={{
+            sx: { width: 300 },
           }}
         >
-          {lastMove &&
-            `New move detected: ${lastMove.jobName} → ${lastMove.assetName}`}
-        </Alert>
-      </Snackbar>
+          <Box sx={{ p: 2 }}>
+            <Box
+              sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}
+            >
+              <Typography variant="h6">
+                {selectedStation ? `${selectedStation.name} Jobs` : "Jobs"}
+              </Typography>
+              <IconButton onClick={handleCloseJobsDrawer}>
+                <CloseIcon />
+              </IconButton>
+            </Box>
+            <List>
+              {selectedStationJobs.map((job) => (
+                <ListItem
+                  key={job.id}
+                  sx={{
+                    "&:hover": {
+                      backgroundColor: "action.hover",
+                    },
+                    backgroundColor:
+                      selectedJob?.id === job.id
+                        ? "action.selected"
+                        : "transparent",
+                    cursor: "pointer",
+                    borderRadius: 1,
+                    mb: 0.5,
+                  }}
+                  onClick={() =>
+                    handleJobSelect(job.id === selectedJob?.id ? null : job)
+                  }
+                >
+                  <ListItemText
+                    primary={job.name}
+                    secondary={`Status: ${job.status}`}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          </Box>
+        </Drawer>
+
+        {/* Move notification */}
+        <Snackbar
+          open={showMoveHighlight}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+          sx={{ mt: 2 }}
+        >
+          <Alert severity="success" sx={{ width: "100%" }}>
+            {lastMove &&
+              `Job ${lastMove.jobName} moved to ${lastMove.assetName}`}
+          </Alert>
+        </Snackbar>
+      </Box>
     </Box>
   );
 };

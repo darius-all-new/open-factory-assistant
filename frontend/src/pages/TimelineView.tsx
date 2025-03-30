@@ -89,13 +89,67 @@ const TimelineView: React.FC = () => {
   const REFRESH_INTERVAL = 30000; // Refresh every 30 seconds
   const [initialLoading, setInitialLoading] = useState<boolean>(true);
 
+  // Parse timestamps with proper timezone handling
+  const parseTimestamp = (timestamp: string | null): Date => {
+    if (!timestamp) return new Date();
+    
+    // Parse the ISO timestamp (which is in UTC) and convert to local time
+    const date = new Date(timestamp);
+    
+    // If timestamp doesn't have timezone info (Z or +/-), assume UTC
+    if (!timestamp.endsWith('Z') && !timestamp.match(/[+-]\d{2}:?\d{2}$/)) {
+      console.warn(`Timestamp ${timestamp} has no timezone info, assuming UTC`);
+      return new Date(timestamp + 'Z');
+    }
+    
+    return date;
+  };
+
+  // Get start of current day in local timezone
+  const getStartOfToday = (): Date => {
+    return startOfDay(new Date());
+  };
+
+  // Get end of current day in local timezone
+  const getEndOfToday = (): Date => {
+    return endOfDay(new Date());
+  };
+
   // Generate date ticks for the timeline
   const getDateTicks = () => {
-    return eachDayOfInterval({
+    const ticks = eachDayOfInterval({
       start: startOfDay(startDate),
       end: endOfDay(endDate),
     });
+    console.log("Timeline range:", {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      ticks: ticks.map(t => t.toISOString())
+    });
+    return ticks;
   };
+
+  // Initialize start date state
+  const [startDate, setStartDate] = useState<Date>(() => {
+    const savedRange = localStorage.getItem("timelineViewDateRange");
+    if (savedRange) {
+      const { start } = JSON.parse(savedRange);
+      return parseTimestamp(start);
+    }
+    // Set start date to start of day 2 weeks ago
+    return startOfDay(subWeeks(getStartOfToday(), 2));
+  });
+
+  // Initialize end date state
+  const [endDate, setEndDate] = useState<Date>(() => {
+    const savedRange = localStorage.getItem("timelineViewDateRange");
+    if (savedRange) {
+      const { end } = JSON.parse(savedRange);
+      return parseTimestamp(end);
+    }
+    // Set end date to end of current day
+    return getEndOfToday();
+  });
 
   // State management
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -105,22 +159,6 @@ const TimelineView: React.FC = () => {
   });
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [timelineData, setTimelineData] = useState<TimelineJob[]>([]);
-  const [startDate, setStartDate] = useState<Date>(() => {
-    const savedRange = localStorage.getItem("timelineViewDateRange");
-    if (savedRange) {
-      const { start } = JSON.parse(savedRange);
-      return new Date(start);
-    }
-    return subWeeks(new Date(), 2);
-  });
-  const [endDate, setEndDate] = useState<Date>(() => {
-    const savedRange = localStorage.getItem("timelineViewDateRange");
-    if (savedRange) {
-      const { end } = JSON.parse(savedRange);
-      return new Date(end);
-    }
-    return new Date();
-  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -175,7 +213,7 @@ const TimelineView: React.FC = () => {
 
   // Handle date preset selection
   const handleDatePreset = (preset: "week" | "2weeks" | "month") => {
-    const end = new Date();
+    const end = getEndOfToday();
     const endOfToday = endOfDay(end);
     let start: Date;
 
@@ -196,137 +234,6 @@ const TimelineView: React.FC = () => {
     setStartDate(start);
     setEndDate(endOfToday);
     setSelectedPreset(preset);
-  };
-
-  // Filter section component
-  const FilterSection = () => {
-    return (
-      <Box sx={{ mb: 3 }}>
-        <TextField
-          fullWidth
-          size="small"
-          placeholder="Search jobs..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <SearchIcon sx={{ mr: 1, color: "action.active" }} />
-            ),
-          }}
-          sx={{ mb: 2 }}
-        />
-        <Box
-          sx={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 1,
-          }}
-        >
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={() => {
-              const newFilters = selectedFilters.includes("in_progress")
-                ? selectedFilters.filter((f) => f !== "in_progress")
-                : [...selectedFilters, "in_progress"];
-              setSelectedFilters(newFilters);
-            }}
-            sx={{
-              flex: "1 1 calc(33% - 8px)",
-              minWidth: 0,
-              textTransform: "none",
-              py: 0.5,
-              border: "1px solid",
-              borderColor: selectedFilters.includes("in_progress")
-                ? "primary.main"
-                : "divider",
-              borderRadius: "4px !important",
-              color: selectedFilters.includes("in_progress")
-                ? "primary.main"
-                : "text.primary",
-              bgcolor: selectedFilters.includes("in_progress")
-                ? (theme) => alpha(theme.palette.primary.main, 0.1)
-                : "transparent",
-              "&:hover": {
-                bgcolor: selectedFilters.includes("in_progress")
-                  ? (theme) => alpha(theme.palette.primary.main, 0.2)
-                  : "action.hover",
-              },
-            }}
-          >
-            In Progress ({getFilterCount("in_progress")})
-          </Button>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={() => {
-              const newFilters = selectedFilters.includes("complete")
-                ? selectedFilters.filter((f) => f !== "complete")
-                : [...selectedFilters, "complete"];
-              setSelectedFilters(newFilters);
-            }}
-            sx={{
-              flex: "1 1 calc(33% - 8px)",
-              minWidth: 0,
-              textTransform: "none",
-              py: 0.5,
-              border: "1px solid",
-              borderColor: selectedFilters.includes("complete")
-                ? "primary.main"
-                : "divider",
-              borderRadius: "4px !important",
-              color: selectedFilters.includes("complete")
-                ? "primary.main"
-                : "text.primary",
-              bgcolor: selectedFilters.includes("complete")
-                ? (theme) => alpha(theme.palette.primary.main, 0.1)
-                : "transparent",
-              "&:hover": {
-                bgcolor: selectedFilters.includes("complete")
-                  ? (theme) => alpha(theme.palette.primary.main, 0.2)
-                  : "action.hover",
-              },
-            }}
-          >
-            Complete ({getFilterCount("complete")})
-          </Button>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={() => {
-              const newFilters = selectedFilters.includes("overdue")
-                ? selectedFilters.filter((f) => f !== "overdue")
-                : [...selectedFilters, "overdue"];
-              setSelectedFilters(newFilters);
-            }}
-            sx={{
-              flex: "1 1 calc(33% - 8px)",
-              minWidth: 0,
-              textTransform: "none",
-              py: 0.5,
-              border: "1px solid",
-              borderColor: selectedFilters.includes("overdue")
-                ? "primary.main"
-                : "divider",
-              borderRadius: "4px !important",
-              color: selectedFilters.includes("overdue")
-                ? "primary.main"
-                : "text.primary",
-              bgcolor: selectedFilters.includes("overdue")
-                ? (theme) => alpha(theme.palette.primary.main, 0.1)
-                : "transparent",
-              "&:hover": {
-                bgcolor: selectedFilters.includes("overdue")
-                  ? (theme) => alpha(theme.palette.primary.main, 0.2)
-                  : "action.hover",
-              },
-            }}
-          >
-            Overdue ({getFilterCount("overdue")})
-          </Button>
-        </Box>
-      </Box>
-    );
   };
 
   // Fetch all jobs
@@ -360,6 +267,14 @@ const TimelineView: React.FC = () => {
       })
     );
   }, [startDate, endDate]);
+
+  // Update end date to end of day whenever it's the current day
+  useEffect(() => {
+    const today = getStartOfToday();
+    if (format(endDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')) {
+      setEndDate(getEndOfToday());
+    }
+  }, [timelineData]);
 
   // Fetch location history for selected jobs and refresh periodically
   useEffect(() => {
@@ -486,11 +401,135 @@ const TimelineView: React.FC = () => {
     return assetColors[colorIndex];
   };
 
-  // Parse timestamps with proper timezone handling
-  const parseTimestamp = (timestamp: string | null): Date => {
-    if (!timestamp) return new Date();
-    // Ensure the timestamp is treated as UTC
-    return new Date(timestamp + "Z");
+  // Filter section component
+  const FilterSection = () => {
+    return (
+      <Box sx={{ mb: 3 }}>
+        <TextField
+          fullWidth
+          size="small"
+          placeholder="Search jobs..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <SearchIcon sx={{ mr: 1, color: "action.active" }} />
+            ),
+          }}
+          sx={{ mb: 2 }}
+        />
+        <Box
+          sx={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 1,
+          }}
+        >
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => {
+              const newFilters = selectedFilters.includes("in_progress")
+                ? selectedFilters.filter((f: string) => f !== "in_progress")
+                : [...selectedFilters, "in_progress"];
+              setSelectedFilters(newFilters);
+            }}
+            sx={{
+              flex: "1 1 calc(33% - 8px)",
+              minWidth: 0,
+              textTransform: "none",
+              py: 0.5,
+              border: "1px solid",
+              borderColor: selectedFilters.includes("in_progress")
+                ? "primary.main"
+                : "divider",
+              borderRadius: "4px !important",
+              color: selectedFilters.includes("in_progress")
+                ? "primary.main"
+                : "text.primary",
+              bgcolor: selectedFilters.includes("in_progress")
+                ? (theme) => alpha(theme.palette.primary.main, 0.1)
+                : "transparent",
+              "&:hover": {
+                bgcolor: selectedFilters.includes("in_progress")
+                  ? (theme) => alpha(theme.palette.primary.main, 0.2)
+                  : "action.hover",
+              },
+            }}
+          >
+            In Progress ({getFilterCount("in_progress")})
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => {
+              const newFilters = selectedFilters.includes("complete")
+                ? selectedFilters.filter((f: string) => f !== "complete")
+                : [...selectedFilters, "complete"];
+              setSelectedFilters(newFilters);
+            }}
+            sx={{
+              flex: "1 1 calc(33% - 8px)",
+              minWidth: 0,
+              textTransform: "none",
+              py: 0.5,
+              border: "1px solid",
+              borderColor: selectedFilters.includes("complete")
+                ? "primary.main"
+                : "divider",
+              borderRadius: "4px !important",
+              color: selectedFilters.includes("complete")
+                ? "primary.main"
+                : "text.primary",
+              bgcolor: selectedFilters.includes("complete")
+                ? (theme) => alpha(theme.palette.primary.main, 0.1)
+                : "transparent",
+              "&:hover": {
+                bgcolor: selectedFilters.includes("complete")
+                  ? (theme) => alpha(theme.palette.primary.main, 0.2)
+                  : "action.hover",
+              },
+            }}
+          >
+            Complete ({getFilterCount("complete")})
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => {
+              const newFilters = selectedFilters.includes("overdue")
+                ? selectedFilters.filter((f: string) => f !== "overdue")
+                : [...selectedFilters, "overdue"];
+              setSelectedFilters(newFilters);
+            }}
+            sx={{
+              flex: "1 1 calc(33% - 8px)",
+              minWidth: 0,
+              textTransform: "none",
+              py: 0.5,
+              border: "1px solid",
+              borderColor: selectedFilters.includes("overdue")
+                ? "primary.main"
+                : "divider",
+              borderRadius: "4px !important",
+              color: selectedFilters.includes("overdue")
+                ? "primary.main"
+                : "text.primary",
+              bgcolor: selectedFilters.includes("overdue")
+                ? (theme) => alpha(theme.palette.primary.main, 0.1)
+                : "transparent",
+              "&:hover": {
+                bgcolor: selectedFilters.includes("overdue")
+                  ? (theme) => alpha(theme.palette.primary.main, 0.2)
+                  : "action.hover",
+              },
+            }}
+          >
+            Overdue ({getFilterCount("overdue")})
+          </Button>
+        </Box>
+      </Box>
+    );
   };
 
   return (

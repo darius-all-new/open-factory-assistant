@@ -17,10 +17,17 @@ You should have received a copy of the GNU General Public License
 along with OpenFactoryAssistant. If not, see <https://www.gnu.org/licenses/>
 '''
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
 from typing import Optional, List
 from models import JobStatus
+from datetime import timezone
+
+def format_datetime(dt: datetime) -> str:
+    """Format datetime to ISO format with UTC timezone"""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat()
 
 class UserBase(BaseModel):
     email: EmailStr
@@ -36,6 +43,9 @@ class User(UserBase):
 
     class Config:
         from_attributes = True
+        json_encoders = {
+            datetime: format_datetime
+        }
 
 class Token(BaseModel):
     access_token: str
@@ -59,6 +69,9 @@ class Customer(CustomerBase):
 
     class Config:
         from_attributes = True
+        json_encoders = {
+            datetime: format_datetime
+        }
 
 class AssetBase(BaseModel):
     name: str
@@ -75,6 +88,9 @@ class Asset(AssetBase):
 
     class Config:
         from_attributes = True
+        json_encoders = {
+            datetime: format_datetime
+        }
 
 class JobLocationBase(BaseModel):
     job_id: int
@@ -90,6 +106,9 @@ class JobLocation(JobLocationBase):
 
     class Config:
         from_attributes = True
+        json_encoders = {
+            datetime: format_datetime
+        }
 
 class JobBase(BaseModel):
     name: str
@@ -108,9 +127,15 @@ class Job(JobBase):
 
     class Config:
         from_attributes = True
+        json_encoders = {
+            datetime: format_datetime
+        }
 
 class JobWithCustomer(Job):
     customer: Customer
 
     class Config:
         from_attributes = True
+        json_encoders = {
+            datetime: format_datetime
+        }
