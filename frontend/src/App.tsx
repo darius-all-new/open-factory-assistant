@@ -44,7 +44,7 @@ import { logger } from "./services/logger";
 const PrivateLayout = () => {
   const token = getAuthToken();
   if (!token) {
-    logger.info('User redirected to signin - no auth token found');
+    logger.info("User redirected to signin - no auth token found");
     return <Navigate to="/signin" replace />;
   }
 

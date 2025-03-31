@@ -26,18 +26,21 @@ import {
   Button,
 } from "@mui/material";
 import { Brightness4, Brightness7, Logout } from "@mui/icons-material";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useTheme } from "../contexts/ThemeContext";
 import { signOut } from "../api/auth";
 
 export const Navbar = () => {
   const { isDarkMode, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = () => {
     signOut();
     navigate("/signin");
   };
+
+  const isActive = (path: string) => location.pathname === path;
 
   return (
     <AppBar position="static" sx={{ width: "100%" }}>
@@ -59,7 +62,10 @@ export const Navbar = () => {
             color="inherit"
             component={Link}
             to="/users"
-            sx={{ textTransform: "none" }}
+            sx={{
+              textTransform: "none",
+              borderBottom: isActive("/users") ? "2px solid white" : "none",
+            }}
           >
             Users
           </Button>
@@ -67,7 +73,10 @@ export const Navbar = () => {
             color="inherit"
             component={Link}
             to="/customers"
-            sx={{ textTransform: "none" }}
+            sx={{
+              textTransform: "none",
+              borderBottom: isActive("/customers") ? "2px solid white" : "none",
+            }}
           >
             Customers
           </Button>
@@ -75,7 +84,10 @@ export const Navbar = () => {
             color="inherit"
             component={Link}
             to="/stations"
-            sx={{ textTransform: "none" }}
+            sx={{
+              textTransform: "none",
+              borderBottom: isActive("/stations") ? "2px solid white" : "none",
+            }}
           >
             Stations
           </Button>
@@ -83,7 +95,10 @@ export const Navbar = () => {
             color="inherit"
             component={Link}
             to="/jobs"
-            sx={{ textTransform: "none" }}
+            sx={{
+              textTransform: "none",
+              borderBottom: isActive("/jobs") ? "2px solid white" : "none",
+            }}
           >
             Jobs
           </Button>
@@ -91,7 +106,10 @@ export const Navbar = () => {
             color="inherit"
             component={Link}
             to="/timeline"
-            sx={{ textTransform: "none" }}
+            sx={{
+              textTransform: "none",
+              borderBottom: isActive("/timeline") ? "2px solid white" : "none",
+            }}
           >
             Timeline
           </Button>
@@ -99,7 +117,10 @@ export const Navbar = () => {
             color="inherit"
             component={Link}
             to="/station-tracker"
-            sx={{ textTransform: "none" }}
+            sx={{
+              textTransform: "none",
+              borderBottom: isActive("/station-tracker") ? "2px solid white" : "none",
+            }}
           >
             Station Tracker
           </Button>
@@ -107,7 +128,10 @@ export const Navbar = () => {
             color="inherit"
             component={Link}
             to="/factory-view"
-            sx={{ textTransform: "none" }}
+            sx={{
+              textTransform: "none",
+              borderBottom: isActive("/factory-view") ? "2px solid white" : "none",
+            }}
           >
             Factory View
           </Button>
