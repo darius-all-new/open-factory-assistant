@@ -85,6 +85,27 @@ npm install --force --progress=true
 cd "$REPO_ROOT/scanner"
 npm install --force --progress=true
 
+# Create service user if it doesn't exist
+if ! id "factoryapp" &>/dev/null; then
+    useradd -r -s /bin/false factoryapp
+fi
+
+# Set permissions for project directory
+chown -R factoryapp:factoryapp "$REPO_ROOT"
+chmod -R 755 "$REPO_ROOT"
+
+# Set permissions for certs directory
+CERTS_DIR="$REPO_ROOT/certs"
+mkdir -p $CERTS_DIR
+chown -R factoryapp:factoryapp $CERTS_DIR
+chmod 700 $CERTS_DIR
+
+# Set permissions for cert files
+chown factoryapp:factoryapp "$CERTS_DIR/$certKey"
+chown factoryapp:factoryapp "$CERTS_DIR/$certCert"
+chmod 600 "$CERTS_DIR/$certKey"
+chmod 644 "$CERTS_DIR/$certCert"
+
 # Create systemd service for backend
 cat > /etc/systemd/system/factoryapp-backend.service << EOL
 [Unit]
@@ -139,11 +160,15 @@ Restart=always
 WantedBy=multi-user.target
 EOL
 
-# Set permissions
-chown -R factoryapp:factoryapp "$REPO_ROOT"
+# Set permissions for systemd service files
+chmod 644 /etc/systemd/system/factoryapp-backend.service
+chmod 644 /etc/systemd/system/factoryapp-frontend.service
+chmod 644 /etc/systemd/system/factoryapp-scanner.service
+
+# Reload systemd to recognize the new services
+systemctl daemon-reload
 
 # Start and enable services
-systemctl daemon-reload
 systemctl enable factoryapp-backend
 systemctl enable factoryapp-frontend
 systemctl enable factoryapp-scanner

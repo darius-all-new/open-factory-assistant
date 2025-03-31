@@ -81,7 +81,7 @@ We provide both automated and manual setup options. Choose the one that suits yo
 
    ```bash
    chmod +x install/setup_raspbian.sh
-   ./install/setup_raspbian.sh
+   sudo ./install/setup_raspbian.sh
    ```
 
    The setup script will:
@@ -223,6 +223,18 @@ To make sure OpenFactoryAssistant is accessible on your local network:
      ```
    - Replace `<windows-pc-ip>` with your Windows PC's local IP address
    - Accept the security certificate warning on first access (development only)
+
+## QR Scanning
+
+OpenFactoryAssistant lets you use QR codes to track jobs in your factory.
+
+All you need to do is create a QR code for each job with the job id encoded in the following format:
+
+```json
+{
+  "job": 1304
+}
+```
 
 ## Documentation
 
