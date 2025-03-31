@@ -6,8 +6,8 @@ import type { ServerOptions } from "vite";
 
 // Use path.join for cross-platform compatibility
 const certsDir = path.join(__dirname, "..", "certs");
-const keyPath = path.join(certsDir, process.env.SSL_KEY || "localhost-key.pem");
-const certPath = path.join(certsDir, process.env.SSL_CERT || "localhost.pem");
+const keyPath = path.join(certsDir, "localhost-key.pem");
+const certPath = path.join(certsDir, "localhost.pem");
 
 // HTTPS configuration with error handling
 const getHttpsConfig = (): ServerOptions["https"] => {

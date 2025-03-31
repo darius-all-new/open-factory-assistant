@@ -105,8 +105,6 @@ Write-Host "`nConfiguring Backend ..." -ForegroundColor Cyan
 $localip = Get-UserConfig "Enter local IP address" "localhost"
 $backendPort = Get-UserConfig "Enter backend port" "8000"
 $secretKey = -join ((65..90) + (97..122) | Get-Random -Count 32 | % {[char]$_})
-$certKey = Get-UserConfig "Enter certificate key file name" "localhost-key"
-$certCert = Get-UserConfig "Enter certificate cert file name" "localhost"
 
 $corsOrigins = "https://localhost:3001,https://localhost:3000,https://$localip`:3001,https://$localip`:3000"
 
@@ -117,8 +115,8 @@ ACCESS_TOKEN_EXPIRE_MINUTES=600
 HOST=$localip
 ADDITIONAL_HOSTS=$localip
 CORS_ORIGINS=$corsOrigins
-CERT_KEY=$certKey`.pem
-CERT_CERT=$certCert`.pem
+CERT_KEY=localhost-key.pem
+CERT_CERT=localhost.pem
 "@
 
 $backendPath = Join-Path $repoRoot "backend"
@@ -130,8 +128,6 @@ Write-Host "`nConfiguring Frontend ..." -ForegroundColor Cyan
 
 $frontendEnv = @"
 VITE_API_URL=https://$localip`:$backendPort
-SSL_KEY=$certKey`.pem
-SSL_CERT=$certCert`.pem
 "@
 
 $frontendPath = Join-Path $repoRoot "frontend"
@@ -143,8 +139,6 @@ Write-Host "`nConfiguring Scanner ..." -ForegroundColor Cyan
 
 $scannerEnv = @"
 VITE_API_URL=https://$localip`:$backendPort
-SSL_KEY=$certKey`.pem
-SSL_CERT=$certCert`.pem
 "@
 
 $scannerPath = Join-Path $repoRoot "scanner"

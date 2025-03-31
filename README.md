@@ -27,7 +27,9 @@ OpenFactoryAssistant has been built to help you take your first steps into digit
 
 ### SSL Certificate Setup
 
-In order to use, for example, an iPhone's camera via the browser for QR scanning, OpenFactoryAssistant needs to run on HTTPS. To do this, we need to generate an SSL certificate and put the files (key and cert) in each subfolder of the project (backend, frontend, and scanner):
+In order to use, for example, an iPhone's camera via the browser for QR scanning, OpenFactoryAssistant needs to run on HTTPS. To do this, we need to generate an SSL certificate and put the files (key and cert) in each subfolder of the project (backend, frontend, and scanner).
+
+**Note: Make sure your files are called `localhost-key.pem` and `localhost.pem`**
 
 1. Generate certificate with mkcert:
 

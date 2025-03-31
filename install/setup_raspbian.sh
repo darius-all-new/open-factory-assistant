@@ -67,10 +67,6 @@ read -p "Enter frontend port (default: 3001): " frontend_port
 frontend_port=${frontend_port:-3001}
 read -p "Enter scanner port (default: 3000): " scanner_port
 scanner_port=${scanner_port:-3000}
-read -p "Enter location of SSL key (default: localhost-key): " certKey
-certKey=${certKey:-localhost-key}
-read -p "Enter location of SSL certificate (default: localhost): " certCert
-certCert=${certCert:-localhost}
 
 # Configure backend
 echo -e "\n${CYAN}Configuring backend...${NC}"
@@ -85,24 +81,24 @@ REFRESH_TOKEN_EXPIRE_DAYS=7
 ALGORITHM=HS256
 ADDITIONAL_HOSTS=$local_ip  # Your local IP address
 CORS_ORIGINS=https://localhost:3001,https://localhost:3000,https://$local_ip:3001,https://$local_ip:3000
-CERT_KEY=$REPO_ROOT/certs/$certKey.pem
-CERT_CERT=$REPO_ROOT/certs/$certCert.pem
+CERT_KEY=$REPO_ROOT/certs/localhost-key.pem
+CERT_CERT=$REPO_ROOT/certs/localhost.pem
 EOL
 
 # Configure frontend
 echo -e "\n${CYAN}Configuring frontend...${NC}"
 cat > "$REPO_ROOT/frontend/.env" << EOL
 VITE_API_URL=https://$local_ip:$backend_port
-SSL_KEY=$REPO_ROOT/certs/$certKey.pem
-SSL_CERT=$REPO_ROOT/certs/$certCert.pem
+SSL_KEY=$REPO_ROOT/certs/localhost-key.pem
+SSL_CERT=$REPO_ROOT/certs/localhost.pem
 EOL
 
 # Configure scanner
 echo -e "\n${CYAN}Configuring scanner...${NC}"
 cat > "$REPO_ROOT/scanner/.env" << EOL
 VITE_API_URL=https://$local_ip:$backend_port
-SSL_KEY=$REPO_ROOT/certs/$certKey.pem
-SSL_CERT=$REPO_ROOT/certs/$certCert.pem
+SSL_KEY=$REPO_ROOT/certs/localhost-key.pem
+SSL_CERT=$REPO_ROOT/certs/localhost.pem
 EOL
 
 # Install frontend dependencies
@@ -124,10 +120,10 @@ chown -R $USER_NAME:$USER_NAME $CERTS_DIR
 chmod 700 $CERTS_DIR
 
 # Set permissions for cert files
-chown $USER_NAME:$USER_NAME "$CERTS_DIR/$certKey"
-chown $USER_NAME:$USER_NAME "$CERTS_DIR/$certCert"
-chmod 600 "$CERTS_DIR/$certKey"
-chmod 644 "$CERTS_DIR/$certCert"
+chown $USER_NAME:$USER_NAME "$CERTS_DIR/localhost-key.pem"
+chown $USER_NAME:$USER_NAME "$CERTS_DIR/localhost.pem"
+chmod 600 "$CERTS_DIR/localhost-key.pem"
+chmod 644 "$CERTS_DIR/localhost.pem"
 
 # Create systemd service for backend
 cat > /etc/systemd/system/factoryapp-backend.service << EOL

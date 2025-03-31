@@ -115,8 +115,8 @@ if [ ! -d "$cert_dir" ]; then
     exit 1
 fi
 
-cert_name=$(get_user_config "Enter certificate name (without extension)" "localhost")
-key_name=$(get_user_config "Enter key name (without extension)" "localhost-key")
+cert_name="localhost"
+key_name="localhost-key"
 
 if [ ! -f "$cert_dir/$cert_name.pem" ] || [ ! -f "$cert_dir/$key_name.pem" ]; then
     echo -e "${RED}SSL certificates not found:${NC}"
