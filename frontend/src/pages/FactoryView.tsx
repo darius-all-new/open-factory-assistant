@@ -98,7 +98,7 @@ export const FactoryView = () => {
   const JOB_HISTORY_INTERVAL = 5000; // milliseconds
   const JOB_UPDATE_NOTIFICATION_DURATION = 5000; // milliseconds
   const PATH_WIDTH = 4;
-  const PATH_COLOR = "#ffffff";
+  const PATH_COLOR = "#ebae3d";
   const ARRIVAL_PATH_COLOR = "#1bb1cf"; // Blue color for arrival path
   const COMPLETION_PATH_COLOR = "#4caf50"; // Green color for completion path
 

@@ -249,12 +249,16 @@ EOL
 echo -e "\n${CYAN}Configuring frontend environment variables...${NC}"
 cat > "$REPO_ROOT/frontend/.env" << EOL
 VITE_API_URL=https://$local_ip:$backend_port
+SSL_KEY=$key_name.pem
+SSL_CERT=$cert_name.pem
 EOL
 
 # Scanner configuration
 echo -e "\n${CYAN}Configuring scanner environment variables...${NC}"
 cat > "$REPO_ROOT/scanner/.env" << EOL
 VITE_API_URL=https://$local_ip:$backend_port
+SSL_KEY=$key_name.pem
+SSL_CERT=$cert_name.pem
 EOL
 
 # Ask if user wants to start the services

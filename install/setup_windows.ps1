@@ -130,6 +130,8 @@ Write-Host "`nConfiguring Frontend ..." -ForegroundColor Cyan
 
 $frontendEnv = @"
 VITE_API_URL=https://$localip`:$backendPort
+SSL_KEY=$certKey`.pem
+SSL_CERT=$certCert`.pem
 "@
 
 $frontendPath = Join-Path $repoRoot "frontend"
@@ -141,6 +143,8 @@ Write-Host "`nConfiguring Scanner ..." -ForegroundColor Cyan
 
 $scannerEnv = @"
 VITE_API_URL=https://$localip`:$backendPort
+SSL_KEY=$certKey`.pem
+SSL_CERT=$certCert`.pem
 "@
 
 $scannerPath = Join-Path $repoRoot "scanner"

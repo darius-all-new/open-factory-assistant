@@ -109,26 +109,32 @@ local_ip=$(hostname -I | cut -d' ' -f1)
 backend_port=$(get_user_config "Enter backend port" "8000")
 frontend_port=$(get_user_config "Enter frontend port" "8080")
 scanner_port=$(get_user_config "Enter scanner port" "8081")
+certKey=$(get_user_config "Enter location of SSL key" "localhost-key")
+certCert=$(get_user_config "Enter location of SSL certificate" "localhost-cert")
 
 # Configure backend
 echo -e "\n${CYAN}Configuring backend...${NC}"
 cat > "$REPO_ROOT/backend/.env" << EOL
 HOST=0.0.0.0
 PORT=$backend_port
-SSL_CERT=/opt/factoryapp/ssl/cert.pem
-SSL_KEY=/opt/factoryapp/ssl/key.pem
+SSL_CERT="$REPO_ROOT/certs/$certCert"
+SSL_KEY="$REPO_ROOT/certs/$certKey"
 EOL
 
 # Configure frontend
 echo -e "\n${CYAN}Configuring frontend...${NC}"
 cat > "$REPO_ROOT/frontend/.env" << EOL
 VITE_API_URL=https://$local_ip:$backend_port
+SSL_KEY="$REPO_ROOT/certs/$certKey"
+SSL_CERT="$REPO_ROOT/certs/$certCert"
 EOL
 
 # Configure scanner
 echo -e "\n${CYAN}Configuring scanner...${NC}"
 cat > "$REPO_ROOT/scanner/.env" << EOL
 VITE_API_URL=https://$local_ip:$backend_port
+SSL_KEY="$REPO_ROOT/certs/$certKey"
+SSL_CERT="$REPO_ROOT/certs/$certCert"
 EOL
 
 # Create systemd service for backend

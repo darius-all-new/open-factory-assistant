@@ -21,10 +21,11 @@ OpenFactoryAssistant has been built to help you take your first steps into digit
 
 - Python 3.8 or higher
 - Node.js 16.x or higher
+- Optional: mkcert (for SSL certificate generation)
 
 ### SSL Certificate Setup
 
-In order to use a mobile device's camera via the browser for QR scanning, our application needs to run on HTTPS. To do this, we need to generate an SSL certificate and put the files (key and cert) in each subfolder of the project (backend, frontend, and scanner):
+In order to use, for example, an iPhone's camera via the browser for QR scanning, OpenFactoryAssistant needs to run on HTTPS. To do this, we need to generate an SSL certificate and put the files (key and cert) in each subfolder of the project (backend, frontend, and scanner):
 
 1. Generate certificate with mkcert:
 
@@ -36,7 +37,7 @@ cd certs
 mkcert localhost
 ```
 
-You don't need to use mkcert. As long as you have the key and cert files in the `certs` folder, that's the important part.
+You don't need to use mkcert. Just make sure you have the key and cert files in the `certs` folder.
 
 ### Browser Compatibility
 
@@ -44,7 +45,7 @@ For the best development experience:
 
 - **Recommended Browser**: Google Chrome is the recommended browser for development and testing
 - **Other Browsers**: Firefox and Safari may have issues with self-signed certificates in development
-- **Certificate Warning**: When accessing the application in Chrome, you'll need to accept the self-signed certificate warning (click "Advanced" -> "Proceed to localhost")
+- **Certificate Warning**: When accessing the application in Chrome, you'll need to accept the self-signed certificate warning (click "Advanced" -> "Proceed to YOUR LOCAL IP")
 
 ### Setup Options
 
@@ -62,17 +63,20 @@ We provide both automated and manual setup options. Choose the one that suits yo
 2. Run the setup script:
 
    **For Mac users:**
+
    ```bash
    chmod +x install/setup_mac.sh
    ./install/setup_mac.sh
    ```
 
    **For Windows users:**
+
    ```powershell
    .\install\setup_windows.ps1
    ```
 
    The setup script will:
+
    - Create necessary environment files
    - Check Python and Node.js installations
    - Set up a Python virtual environment
@@ -93,7 +97,7 @@ If you prefer manual setup, follow the steps below:
    cd open-factory-assistant
    ```
 
-2. Set up Python virtual environment:
+2. Set up Python virtual environment (called "venv"):
 
    ```bash
    python -m venv venv
@@ -103,15 +107,17 @@ If you prefer manual setup, follow the steps below:
 
 3. Configure environment variables:
 
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   # Make sure to set HTTPS=true and update SSL certificate paths
-   ```
+You will need to set a secret key, host, port, key/cert location and make sure CORS origins are set correctly.
+
+```bash
+cp .env.example .env
+# Edit .env with your configuration
+# Make sure to set HTTPS=true and update SSL certificate paths
+```
 
 4. Start the backend server:
    ```bash
-   python -m uvicorn main:app --host 0.0.0.0 --port 8000 --ssl-keyfile=key.pem --ssl-certfile=cert.pem
+   python run.py
    ```
 
 ### Frontend Setup
@@ -133,7 +139,6 @@ If you prefer manual setup, follow the steps below:
    ```bash
    cp .env.example .env
    # Edit .env with your configuration
-   # Make sure to set HTTPS=true and update SSL certificate paths
    ```
 
 4. Start the development server:
