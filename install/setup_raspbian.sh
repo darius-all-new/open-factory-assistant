@@ -19,6 +19,28 @@ fi
 # Get repository root directory
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# Menu for user choice
+echo -e "${CYAN}Please select an option:${NC}"
+echo "1) Run Setup"
+echo "2) Update OpenFactoryAssistant"
+read -p "Enter your choice: " choice
+
+case $choice in
+    1)
+        echo -e "${GREEN}Running setup...${NC}"
+        ;;
+    2)
+        echo -e "${GREEN}Updating OpenFactoryAssistant...${NC}"
+        cd "$REPO_ROOT"
+        git pull
+        exit 0
+        ;;
+    *)
+        echo -e "${RED}Invalid choice! Exiting...${NC}"
+        exit 1
+        ;;
+esac
+
 # Update system and install dependencies
 apt update
 apt install -y python3-pip python3-venv nodejs npm
