@@ -183,6 +183,7 @@ def update_job_status(
         
         # If marking as complete, ensure all locations have departure times
         if status == models.JobStatus.COMPLETE:
+            # First try to find current location (where departure_time is NULL)
             current_location = (
                 db.query(models.JobLocation)
                 .filter(
@@ -191,7 +192,18 @@ def update_job_status(
                 )
                 .first()
             )
-            if current_location:
+            
+            # If no current location found, get the last location
+            if not current_location:
+                current_location = (
+                    db.query(models.JobLocation)
+                    .filter(models.JobLocation.job_id == job_id)
+                    .order_by(models.JobLocation.arrival_time.desc())
+                    .first()
+                )
+            
+            # Set departure time if we found a location and it doesn't already have one
+            if current_location and current_location.departure_time is None:
                 logger.debug(f"Setting departure time for completed job ID={job_id} from asset ID={current_location.asset_id}")
                 current_location.departure_time = get_current_time_utc()
         

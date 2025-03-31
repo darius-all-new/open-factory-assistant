@@ -37,6 +37,7 @@ import {
   TableRow,
   Collapse,
   useTheme,
+  Stack,
   Badge,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
@@ -60,6 +61,7 @@ interface StationFormData {
 }
 
 export default function Stations() {
+  const theme = useTheme();
   const { token } = useAuth();
   const [stations, setStations] = useState<Station[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -279,38 +281,56 @@ export default function Stations() {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Box sx={{ display: "flex", gap: 2, mb: 3, alignItems: "center" }}>
-        <TextField
-          size="small"
-          placeholder="Search stations..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <SearchIcon sx={{ mr: 1, color: "action.active" }} />
-            ),
-          }}
-          sx={{ flex: 1 }}
-        />
-        <Button
-          variant={showOnlyWithJobs ? "contained" : "outlined"}
-          onClick={() => setShowOnlyWithJobs(!showOnlyWithJobs)}
-          startIcon={<EngineeringIcon />}
-          sx={{
-            borderColor: showOnlyWithJobs ? "primary.main" : "divider",
-            minWidth: 180,
-          }}
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3,
+        }}
+      >
+        <Typography
+          variant="h4"
+          sx={{ fontWeight: "bold", color: theme.palette.primary.main }}
         >
-          {showOnlyWithJobs ? "Show All" : "Active Only"}
-        </Button>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setIsAddDialogOpen(true)}
-        >
-          Add Station
-        </Button>
+          Stations
+        </Typography>
+        <Box sx={{ display: "flex", gap: 2 }}>
+          <Button
+            variant={showOnlyWithJobs ? "contained" : "outlined"}
+            onClick={() => setShowOnlyWithJobs(!showOnlyWithJobs)}
+            startIcon={<EngineeringIcon />}
+            sx={{
+              borderColor: showOnlyWithJobs ? "primary.main" : "divider",
+              minWidth: 180,
+            }}
+          >
+            {showOnlyWithJobs ? "Show All" : "Active Only"}
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setIsAddDialogOpen(true)}
+          >
+            Add Station
+          </Button>
+        </Box>
       </Box>
+      <Paper sx={{ mb: 3, p: 2 }}>
+        <Stack spacing={2}>
+          <Box sx={{ display: "flex", alignItems: "center" }}>
+            <SearchIcon sx={{ color: "action.active", mr: 1 }} />
+            <TextField
+              fullWidth
+              variant="outlined"
+              size="small"
+              placeholder="Search stations..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </Box>
+        </Stack>
+      </Paper>
 
       <TableContainer component={Paper}>
         <Table aria-label="stations table">

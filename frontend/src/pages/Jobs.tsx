@@ -45,6 +45,8 @@ import {
   Collapse,
   Menu,
   alpha,
+  Pagination,
+  SelectChangeEvent,
 } from "@mui/material";
 import Timeline from "@mui/lab/Timeline";
 import TimelineItem from "@mui/lab/TimelineItem";
@@ -103,6 +105,8 @@ export default function Jobs() {
     customer_id: 0,
     due_date: "",
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [jobsPerPage, setJobsPerPage] = useState(10);
 
   const fetchJobHistory = async (jobId: number) => {
     if (!token) return;
@@ -210,7 +214,9 @@ export default function Jobs() {
   const isJobOverdue = (job: Job) => {
     if (!job.due_date) return false;
     const dueDate = new Date(job.due_date);
-    return dueDate < getCurrentTime() && job.status.toLowerCase() !== "complete";
+    return (
+      dueDate < getCurrentTime() && job.status.toLowerCase() !== "complete"
+    );
   };
 
   const getStatusColor = (status: string) => {
@@ -246,7 +252,7 @@ export default function Jobs() {
 
   const handleExportCSV = async () => {
     if (!token) return;
-    
+
     // Make sure we have the full history for all jobs
     const jobsWithHistory = await Promise.all(
       jobs.map(async (job) => {
@@ -263,6 +269,20 @@ export default function Jobs() {
     const timestamp = new Date().toISOString().split("T")[0] || "export";
     downloadCSV(csvContent, `jobs_export_${timestamp}.csv`);
   };
+
+  const handlePageChange = (_: React.ChangeEvent<unknown>, value: number) => {
+    setCurrentPage(value);
+  };
+
+  const handleJobsPerPageChange = (event: SelectChangeEvent<number>) => {
+    setJobsPerPage(Number(event.target.value));
+    setCurrentPage(1); // Reset to first page
+  };
+
+  const paginatedJobs = filteredJobs.slice(
+    (currentPage - 1) * jobsPerPage,
+    currentPage * jobsPerPage
+  );
 
   return (
     <Box sx={{ p: 3 }}>
@@ -340,11 +360,13 @@ export default function Jobs() {
               sx={{
                 color: statusFilter === "overdue" ? "white" : "error.main",
                 borderColor: "error.main",
-                bgcolor: statusFilter === "overdue" ? "error.main" : "transparent",
+                bgcolor:
+                  statusFilter === "overdue" ? "error.main" : "transparent",
                 "&:hover": {
-                  bgcolor: statusFilter === "overdue" ? "error.dark" : "error.light",
-                  borderColor: "error.main"
-                }
+                  bgcolor:
+                    statusFilter === "overdue" ? "error.dark" : "error.light",
+                  borderColor: "error.main",
+                },
               }}
             >
               Overdue Jobs
@@ -352,6 +374,34 @@ export default function Jobs() {
           </Box>
         </Stack>
       </Paper>
+
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 2,
+        }}
+      >
+        <FormControl variant="outlined" size="small">
+          <InputLabel>Show</InputLabel>
+          <Select
+            value={jobsPerPage}
+            onChange={handleJobsPerPageChange}
+            label="Jobs per page"
+          >
+            <MenuItem value={5}>5</MenuItem>
+            <MenuItem value={10}>10</MenuItem>
+            <MenuItem value={25}>25</MenuItem>
+          </Select>
+        </FormControl>
+        <Pagination
+          count={Math.ceil(filteredJobs.length / jobsPerPage)}
+          page={currentPage}
+          onChange={handlePageChange}
+          color="primary"
+        />
+      </Box>
 
       <TableContainer component={Paper}>
         <Table>
@@ -365,7 +415,7 @@ export default function Jobs() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredJobs.map((job) => (
+            {paginatedJobs.map((job) => (
               <React.Fragment key={job.id}>
                 <TableRow
                   sx={{
@@ -419,14 +469,14 @@ export default function Jobs() {
                           {new Date(job.due_date).toLocaleDateString()}
                         </Typography>
                         {isJobOverdue(job) && (
-                          <Typography 
-                            variant="caption" 
-                            sx={{ 
+                          <Typography
+                            variant="caption"
+                            sx={{
                               color: "error.main",
                               fontWeight: "medium",
                               display: "flex",
                               alignItems: "center",
-                              gap: 0.5
+                              gap: 0.5,
                             }}
                           >
                             Overdue
@@ -603,6 +653,22 @@ export default function Jobs() {
           </TableBody>
         </Table>
       </TableContainer>
+
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "right",
+          alignItems: "center",
+          mt: 2,
+        }}
+      >
+        <Pagination
+          count={Math.ceil(filteredJobs.length / jobsPerPage)}
+          page={currentPage}
+          onChange={handlePageChange}
+          color="primary"
+        />
+      </Box>
 
       <Dialog
         open={isAddDialogOpen}

@@ -38,7 +38,7 @@ export interface JobLocation {
 }
 
 export interface JobWithHistory {
-  history?: JobLocation[];
+  locations?: JobLocation[];
 }
 
 export interface Job extends JobWithHistory {

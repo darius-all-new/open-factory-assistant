@@ -10,6 +10,8 @@ dist-ssr
 
 .DS_Store
 
+FactoryView__.tsx
+
 scannerarchive/
 archive.txt
 cert.pem
