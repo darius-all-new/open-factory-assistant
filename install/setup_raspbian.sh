@@ -79,24 +79,24 @@ REFRESH_TOKEN_EXPIRE_DAYS=7
 ALGORITHM=HS256
 ADDITIONAL_HOSTS=$local_ip  # Your local IP address
 CORS_ORIGINS=https://localhost:3001,https://localhost:3000,https://$local_ip:3001,https://$local_ip:3000
-CERT_KEY="$REPO_ROOT/certs/$certKey"
-CERT_CERT="$REPO_ROOT/certs/$certCert"
+CERT_KEY=$REPO_ROOT/certs/$certKey.pem
+CERT_CERT=$REPO_ROOT/certs/$certCert.pem
 EOL
 
 # Configure frontend
 echo -e "\n${CYAN}Configuring frontend...${NC}"
 cat > "$REPO_ROOT/frontend/.env" << EOL
 VITE_API_URL=https://$local_ip:$backend_port
-SSL_KEY="$REPO_ROOT/certs/$certKey"
-SSL_CERT="$REPO_ROOT/certs/$certCert"
+SSL_KEY=$REPO_ROOT/certs/$certKey.pem
+SSL_CERT=$REPO_ROOT/certs/$certCert.pem
 EOL
 
 # Configure scanner
 echo -e "\n${CYAN}Configuring scanner...${NC}"
 cat > "$REPO_ROOT/scanner/.env" << EOL
 VITE_API_URL=https://$local_ip:$backend_port
-SSL_KEY="$REPO_ROOT/certs/$certKey"
-SSL_CERT="$REPO_ROOT/certs/$certCert"
+SSL_KEY=$REPO_ROOT/certs/$certKey.pem
+SSL_CERT=$REPO_ROOT/certs/$certCert.pem
 EOL
 
 # Install frontend dependencies
@@ -107,21 +107,21 @@ npm install --force --progress=true
 cd "$REPO_ROOT/scanner"
 npm install --force --progress=true
 
-# Set permissions for project directory
-chown -R $(whoami):$(whoami) "$REPO_ROOT"
-chmod -R 755 "$REPO_ROOT"
+# # Set permissions for project directory
+# chown -R $(whoami):$(whoami) "$REPO_ROOT"
+# chmod -R 755 "$REPO_ROOT"
 
-# Set permissions for certs directory
-CERTS_DIR="$REPO_ROOT/certs"
-mkdir -p $CERTS_DIR
-chown -R $(whoami):$(whoami) $CERTS_DIR
-chmod 700 $CERTS_DIR
+# # Set permissions for certs directory
+# CERTS_DIR="$REPO_ROOT/certs"
+# mkdir -p $CERTS_DIR
+# chown -R $(whoami):$(whoami) $CERTS_DIR
+# chmod 700 $CERTS_DIR
 
-# Set permissions for cert files
-chown $(whoami):$(whoami) "$CERTS_DIR/$certKey"
-chown $(whoami):$(whoami) "$CERTS_DIR/$certCert"
-chmod 600 "$CERTS_DIR/$certKey"
-chmod 644 "$CERTS_DIR/$certCert"
+# # Set permissions for cert files
+# chown $(whoami):$(whoami) "$CERTS_DIR/$certKey"
+# chown $(whoami):$(whoami) "$CERTS_DIR/$certCert"
+# chmod 600 "$CERTS_DIR/$certKey"
+# chmod 644 "$CERTS_DIR/$certCert"
 
 # Create systemd service for backend
 cat > /etc/systemd/system/factoryapp-backend.service << EOL
@@ -214,16 +214,16 @@ create_initial_user() {
     json_data="{\"username\":\"$username\",\"email\":\"$email\",\"password\":\"$password\"}"
 
     # Make API request
-    response=$(curl -s -X POST "$backend_url/users/register" \
+    http_status=$(curl -s -k -o /dev/null -w "%{http_code}" -X POST "$backend_url/users/register" \
         -H "Content-Type: application/json" \
         -d "$json_data")
 
-    if [ $? -eq 0 ]; then
+    if [ "$http_status" -eq 200 ] || [ "$http_status" -eq 201 ]; then
         echo -e "${GREEN}User created successfully!${NC}"
         echo -e "${GREEN}You can now log in with your username and password.${NC}"
         return 0
     else
-        echo -e "${RED}Failed to create user: $response${NC}"
+        echo -e "${RED}Failed to create user: $http_status${NC}"
         return 1
     fi
 }

@@ -31,8 +31,8 @@ if __name__ == "__main__":
     
     # Set up SSL certificate paths using pathlib for cross-platform compatibility
     cert_dir = project_root / "certs"
-    ssl_keyfile = cert_dir / os.getenv("CERT_KEY", "key.pem")
-    ssl_certfile = cert_dir / os.getenv("CERT_CERT", "cert.pem")
+    ssl_keyfile = cert_dir / os.getenv("CERT_KEY", "localhost-key.pem")
+    ssl_certfile = cert_dir / os.getenv("CERT_CERT", "localhost.pem")
     
     # Create certs directory if it doesn't exist
     cert_dir.mkdir(exist_ok=True)
@@ -45,12 +45,13 @@ if __name__ == "__main__":
     
     # Get host from environment or default to localhost
     host = os.getenv("HOST", "localhost")
+    port = os.getenv("PORT", 8000)
     
     # Run the server with SSL
     uvicorn.run(
         "main:app",
         host=host,
-        port=8000,
+        port=port,
         ssl_keyfile=str(ssl_keyfile),
         ssl_certfile=str(ssl_certfile),
         reload=True
