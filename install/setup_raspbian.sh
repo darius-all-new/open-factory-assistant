@@ -107,24 +107,19 @@ npm install --force --progress=true
 cd "$REPO_ROOT/scanner"
 npm install --force --progress=true
 
-# Create service user if it doesn't exist
-if ! id "factoryapp" &>/dev/null; then
-    useradd -r -s /bin/false factoryapp
-fi
-
 # Set permissions for project directory
-chown -R factoryapp:factoryapp "$REPO_ROOT"
+chown -R $(whoami):$(whoami) "$REPO_ROOT"
 chmod -R 755 "$REPO_ROOT"
 
 # Set permissions for certs directory
 CERTS_DIR="$REPO_ROOT/certs"
 mkdir -p $CERTS_DIR
-chown -R factoryapp:factoryapp $CERTS_DIR
+chown -R $(whoami):$(whoami) $CERTS_DIR
 chmod 700 $CERTS_DIR
 
 # Set permissions for cert files
-chown factoryapp:factoryapp "$CERTS_DIR/$certKey"
-chown factoryapp:factoryapp "$CERTS_DIR/$certCert"
+chown $(whoami):$(whoami) "$CERTS_DIR/$certKey"
+chown $(whoami):$(whoami) "$CERTS_DIR/$certCert"
 chmod 600 "$CERTS_DIR/$certKey"
 chmod 644 "$CERTS_DIR/$certCert"
 
@@ -136,7 +131,7 @@ After=network.target
 
 [Service]
 Type=simple
-User=factoryapp
+User=$(whoami)
 WorkingDirectory=$REPO_ROOT/backend
 Environment=PATH=$VENV_PATH/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=$VENV_PATH/bin/python run.py
@@ -154,7 +149,7 @@ After=network.target
 
 [Service]
 Type=simple
-User=factoryapp
+User=$(whoami)
 WorkingDirectory=$REPO_ROOT/frontend
 Environment=PATH=/usr/bin:/bin:/usr/local/bin
 ExecStart=/usr/bin/npm run dev
@@ -172,7 +167,7 @@ After=network.target
 
 [Service]
 Type=simple
-User=factoryapp
+User=$(whoami)
 WorkingDirectory=$REPO_ROOT/scanner
 Environment=PATH=/usr/bin:/bin:/usr/local/bin
 ExecStart=/usr/bin/npm run dev
