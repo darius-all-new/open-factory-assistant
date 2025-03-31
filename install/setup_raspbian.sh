@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Open Factory Assistant Setup Script for Raspberry Pi (Raspbian)
-# This script helps set up the environment and system services
+# Simplified script to set up the environment and system services
 
 # Print with colors
 GREEN='\033[0;32m'
@@ -10,21 +10,151 @@ RED='\033[0;31m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}Welcome to Open Factory Assistant Setup for Raspberry Pi${NC}"
-echo -e "${GREEN}This script will help you configure your environment and services.${NC}\n"
+# Ensure script is run as root
+if [ "$EUID" -ne 0 ]; then 
+    echo -e "${RED}Please run as root (sudo)${NC}"
+    exit 1
+fi
 
-# Function to prompt for configuration values
-get_user_config() {
-    local prompt=$1
-    local default=$2
-    read -p "$prompt (default: $default): " input
-    echo "${input:-$default}"
-}
+# Get repository root directory
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Function to create initial user
+# Update system and install dependencies
+apt update
+apt install -y python3-pip python3-venv nodejs npm
+
+# Setup Python virtual environment in project directory
+VENV_PATH="$REPO_ROOT/backend/ofa"
+python3 -m venv $VENV_PATH
+source $VENV_PATH/bin/activate
+pip install --progress-bar=on -r "$REPO_ROOT/backend/requirements.txt"
+
+echo -e "${GREEN}Python environment setup complete.${NC}"
+
+# Get user configuration inputs
+local_ip=$(hostname -I | cut -d' ' -f1)
+read -p "Enter backend port (default: 8000): " backend_port
+backend_port=${backend_port:-8000}
+read -p "Enter frontend port (default: 3001): " frontend_port
+frontend_port=${frontend_port:-3001}
+read -p "Enter scanner port (default: 3000): " scanner_port
+scanner_port=${scanner_port:-3000}
+read -p "Enter location of SSL key (default: localhost-key): " certKey
+certKey=${certKey:-localhost-key}
+read -p "Enter location of SSL certificate (default: localhost): " certCert
+certCert=${certCert:-localhost}
+
+# Configure backend
+echo -e "\n${CYAN}Configuring backend...${NC}"
+cat > "$REPO_ROOT/backend/.env" << EOL
+HOST=0.0.0.0
+PORT=$backend_port
+DATABASE_URL=sqlite:///./app.db
+SECRET_KEY=$(openssl rand -hex 32)
+REFRESH_SECRET_KEY=$(openssl rand -hex 32)
+ACCESS_TOKEN_EXPIRE_MINUTES=600
+REFRESH_TOKEN_EXPIRE_DAYS=7
+ALGORITHM=HS256
+ADDITIONAL_HOSTS=$local_ip  # Your local IP address
+CORS_ORIGINS=https://localhost:3001,https://localhost:3000,https://$local_ip:3001,https://$local_ip:3000
+CERT_KEY="$REPO_ROOT/certs/$certKey"
+CERT_CERT="$REPO_ROOT/certs/$certCert"
+EOL
+
+# Configure frontend
+echo -e "\n${CYAN}Configuring frontend...${NC}"
+cat > "$REPO_ROOT/frontend/.env" << EOL
+VITE_API_URL=https://$local_ip:$backend_port
+SSL_KEY="$REPO_ROOT/certs/$certKey"
+SSL_CERT="$REPO_ROOT/certs/$certCert"
+EOL
+
+# Configure scanner
+echo -e "\n${CYAN}Configuring scanner...${NC}"
+cat > "$REPO_ROOT/scanner/.env" << EOL
+VITE_API_URL=https://$local_ip:$backend_port
+SSL_KEY="$REPO_ROOT/certs/$certKey"
+SSL_CERT="$REPO_ROOT/certs/$certCert"
+EOL
+
+# Install frontend dependencies
+cd "$REPO_ROOT/frontend"
+npm install --force --progress=true
+
+# Install scanner dependencies
+cd "$REPO_ROOT/scanner"
+npm install --force --progress=true
+
+# Create systemd service for backend
+cat > /etc/systemd/system/factoryapp-backend.service << EOL
+[Unit]
+Description=Factory Assistant Backend
+After=network.target
+
+[Service]
+Type=simple
+User=factoryapp
+WorkingDirectory=$REPO_ROOT/backend
+Environment=PATH=$VENV_PATH/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=$VENV_PATH/bin/python run.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOL
+
+# Create systemd service for frontend
+cat > /etc/systemd/system/factoryapp-frontend.service << EOL
+[Unit]
+Description=Factory Assistant Frontend
+After=network.target
+
+[Service]
+Type=simple
+User=factoryapp
+WorkingDirectory=$REPO_ROOT/frontend
+Environment=PATH=/usr/bin:/bin:/usr/local/bin
+ExecStart=/usr/bin/npm run dev
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOL
+
+# Create systemd service for scanner
+cat > /etc/systemd/system/factoryapp-scanner.service << EOL
+[Unit]
+Description=Factory Assistant Scanner
+After=network.target
+
+[Service]
+Type=simple
+User=factoryapp
+WorkingDirectory=$REPO_ROOT/scanner
+Environment=PATH=/usr/bin:/bin:/usr/local/bin
+ExecStart=/usr/bin/npm run dev
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOL
+
+# Set permissions
+chown -R factoryapp:factoryapp "$REPO_ROOT"
+
+# Start and enable services
+systemctl daemon-reload
+systemctl enable factoryapp-backend
+systemctl enable factoryapp-frontend
+systemctl enable factoryapp-scanner
+systemctl start factoryapp-backend
+systemctl start factoryapp-frontend
+systemctl start factoryapp-scanner
+
+# Function to create an initial user
 create_initial_user() {
     local backend_url=$1
-    
+
     echo -e "\n${CYAN}Let's create your initial user${NC}"
     read -p "Enter username: " username
     read -p "Enter email: " email
@@ -56,175 +186,13 @@ create_initial_user() {
     fi
 }
 
-# Get repository root directory
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
-# Check if running as root
-if [ "$EUID" -ne 0 ]; then 
-    echo -e "${RED}Please run as root (sudo)${NC}"
-    exit 1
-fi
-
-# Update system and install dependencies
-echo -e "\n${CYAN}Updating system and installing dependencies...${NC}"
-apt update
-apt install -y python3-pip python3-venv nodejs npm openssl nginx
-
-# Create service user
-echo -e "\n${CYAN}Creating service user...${NC}"
-useradd -r -s /bin/false factoryapp || true
-
-# Setup Python virtual environment
-echo -e "\n${CYAN}Setting up Python virtual environment...${NC}"
-VENV_PATH="/opt/factoryapp/venv"
-mkdir -p /opt/factoryapp
-python3 -m venv $VENV_PATH
-
-# Activate virtual environment and install requirements
-source $VENV_PATH/bin/activate
-pip install -r "$REPO_ROOT/backend/requirements.txt"
-
-# Install frontend dependencies
-echo -e "\n${CYAN}Installing frontend dependencies...${NC}"
-cd "$REPO_ROOT/frontend"
-npm install
-
-# Install scanner dependencies
-echo -e "\n${CYAN}Installing scanner dependencies...${NC}"
-cd "$REPO_ROOT/scanner"
-npm install
-
-# Generate SSL certificates
-echo -e "\n${CYAN}Generating SSL certificates...${NC}"
-SSL_DIR="/opt/factoryapp/ssl"
-mkdir -p $SSL_DIR
-
-if [ ! -f "$SSL_DIR/cert.pem" ] || [ ! -f "$SSL_DIR/key.pem" ]; then
-    openssl req -x509 -newkey rsa:4096 -keyout "$SSL_DIR/key.pem" -out "$SSL_DIR/cert.pem" -days 365 -nodes -subj "/CN=localhost"
-fi
-
-# Get configuration
-echo -e "\n${CYAN}Configuring environment...${NC}"
-local_ip=$(hostname -I | cut -d' ' -f1)
-backend_port=$(get_user_config "Enter backend port" "8000")
-frontend_port=$(get_user_config "Enter frontend port" "8080")
-scanner_port=$(get_user_config "Enter scanner port" "8081")
-certKey=$(get_user_config "Enter location of SSL key" "localhost-key")
-certCert=$(get_user_config "Enter location of SSL certificate" "localhost-cert")
-
-# Configure backend
-echo -e "\n${CYAN}Configuring backend...${NC}"
-cat > "$REPO_ROOT/backend/.env" << EOL
-HOST=0.0.0.0
-PORT=$backend_port
-SSL_CERT="$REPO_ROOT/certs/$certCert"
-SSL_KEY="$REPO_ROOT/certs/$certKey"
-EOL
-
-# Configure frontend
-echo -e "\n${CYAN}Configuring frontend...${NC}"
-cat > "$REPO_ROOT/frontend/.env" << EOL
-VITE_API_URL=https://$local_ip:$backend_port
-SSL_KEY="$REPO_ROOT/certs/$certKey"
-SSL_CERT="$REPO_ROOT/certs/$certCert"
-EOL
-
-# Configure scanner
-echo -e "\n${CYAN}Configuring scanner...${NC}"
-cat > "$REPO_ROOT/scanner/.env" << EOL
-VITE_API_URL=https://$local_ip:$backend_port
-SSL_KEY="$REPO_ROOT/certs/$certKey"
-SSL_CERT="$REPO_ROOT/certs/$certCert"
-EOL
-
-# Create systemd service for backend
-echo -e "\n${CYAN}Creating backend service...${NC}"
-cat > /etc/systemd/system/factoryapp-backend.service << EOL
-[Unit]
-Description=Factory Assistant Backend
-After=network.target
-
-[Service]
-Type=simple
-User=factoryapp
-WorkingDirectory=$REPO_ROOT/backend
-Environment=PATH=$VENV_PATH/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=$VENV_PATH/bin/python run.py
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-EOL
-
-# Create systemd service for frontend
-echo -e "\n${CYAN}Creating frontend service...${NC}"
-cat > /etc/systemd/system/factoryapp-frontend.service << EOL
-[Unit]
-Description=Factory Assistant Frontend
-After=network.target
-
-[Service]
-Type=simple
-User=factoryapp
-WorkingDirectory=$REPO_ROOT/frontend
-Environment=PATH=/usr/bin:/bin:/usr/local/bin
-ExecStart=/usr/bin/npm run preview -- --port $frontend_port --host
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-EOL
-
-# Create systemd service for scanner
-echo -e "\n${CYAN}Creating scanner service...${NC}"
-cat > /etc/systemd/system/factoryapp-scanner.service << EOL
-[Unit]
-Description=Factory Assistant Scanner
-After=network.target
-
-[Service]
-Type=simple
-User=factoryapp
-WorkingDirectory=$REPO_ROOT/scanner
-Environment=PATH=/usr/bin:/bin:/usr/local/bin
-ExecStart=/usr/bin/npm run preview -- --port $scanner_port --host
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-EOL
-
-# Set permissions
-echo -e "\n${CYAN}Setting permissions...${NC}"
-chown -R factoryapp:factoryapp /opt/factoryapp
-chown -R factoryapp:factoryapp "$REPO_ROOT"
-chmod 600 "$SSL_DIR/key.pem"
-chmod 644 "$SSL_DIR/cert.pem"
-
-# Start and enable services
-echo -e "\n${CYAN}Starting services...${NC}"
-systemctl daemon-reload
-systemctl enable factoryapp-backend
-systemctl enable factoryapp-frontend
-systemctl enable factoryapp-scanner
-systemctl start factoryapp-backend
-systemctl start factoryapp-frontend
-systemctl start factoryapp-scanner
-
 # Wait for backend to start
-echo -e "\n${CYAN}Waiting for services to start...${NC}"
+echo -e "\n${CYAN}Waiting for backend to start...${NC}"
 sleep 10
 
 # Create initial user
 backend_url="https://$local_ip:$backend_port"
 create_initial_user "$backend_url"
 
-echo -e "\n${GREEN}Setup complete! Your services are running at:${NC}"
-echo -e "Backend: ${CYAN}https://$local_ip:$backend_port${NC}"
-echo -e "Frontend: ${CYAN}http://$local_ip:$frontend_port${NC}"
-echo -e "Scanner: ${CYAN}http://$local_ip:$scanner_port${NC}"
-echo -e "\n${YELLOW}Note: The services will start automatically on boot.${NC}"
-echo -e "${YELLOW}You can manage them with:${NC}"
-echo -e "sudo systemctl status factoryapp-backend"
-echo -e "sudo systemctl status factoryapp-frontend"
-echo -e "sudo systemctl status factoryapp-scanner"
+# Completion message
+echo -e "${GREEN}Setup complete! Services are running.${NC}"
