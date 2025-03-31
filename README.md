@@ -64,36 +64,33 @@ We provide both automated and manual setup options. Choose the one that suits yo
 
 2. Run the setup script:
 
-   **For Mac users:**
+The setup script will:
 
-   ```bash
-   chmod +x install/setup_mac.sh
-   ./install/setup_mac.sh
-   ```
+- Create necessary environment files (.env)
+- Check Python and Node.js installations
+- Set up a Python virtual environment
+- Install Python requirements
+- Install npm dependencies
+- Configure environment variables
+- Launch the services (backend, frontend, and scanner)
+- Create a user (optional)
 
-   **For Windows users:**
+**For Mac users:**
 
-   ```powershell
-   .\install\setup_windows.ps1
-   ```
+```bash
+chmod +x install/setup_mac.sh
+./install/setup_mac.sh
+```
 
-   **For Raspberry Pi users:**
+**For Windows users:**
 
-   ```bash
-   chmod +x install/setup_raspbian.sh
-   sudo ./install/setup_raspbian.sh
-   ```
+```powershell
+.\install\setup_windows.ps1
+```
 
-   The setup script will:
+**For Raspberry Pi users:**
 
-   - Create necessary environment files (.env)
-   - Check Python and Node.js installations
-   - Set up a Python virtual environment
-   - Install Python requirements
-   - Install npm dependencies
-   - Configure environment variables
-   - Launch the services (backend, frontend, and scanner)
-   - Create a user (optional)
+Dedicated startup script coming soon!
 
 #### Manual Setup
 

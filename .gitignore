@@ -27,6 +27,8 @@ ofa/
 .env/
 *.env
 
+setup_backup.sh
+
 __pycache__
 */__pycache__
 
