@@ -105,8 +105,8 @@ Write-Host "`nConfiguring Backend ..." -ForegroundColor Cyan
 $localip = Get-UserConfig "Enter local IP address" "localhost"
 $backendPort = Get-UserConfig "Enter backend port" "8000"
 $secretKey = -join ((65..90) + (97..122) | Get-Random -Count 32 | % {[char]$_})
-$certKey = Get-UserConfig "Enter certificate key file name" "localhost-key.pem"
-$certCert = Get-UserConfig "Enter certificate cert file name" "localhost.pem"
+$certKey = Get-UserConfig "Enter certificate key file name" "localhost-key"
+$certCert = Get-UserConfig "Enter certificate cert file name" "localhost"
 
 $corsOrigins = "https://localhost:3001,https://localhost:3000,https://$localip`:3001,https://$localip`:3000"
 
@@ -117,8 +117,8 @@ ACCESS_TOKEN_EXPIRE_MINUTES=600
 HOST=$localip
 ADDITIONAL_HOSTS=$localip
 CORS_ORIGINS=$corsOrigins
-CERT_KEY=$certKey
-CERT_CERT=$certCert
+CERT_KEY=$certKey`.pem
+CERT_CERT=$certCert`.pem
 "@
 
 $backendPath = Join-Path $repoRoot "backend"
