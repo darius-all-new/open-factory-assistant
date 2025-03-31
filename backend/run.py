@@ -51,7 +51,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host=host,
-        port=port,
+        port=int(port),
         ssl_keyfile=str(ssl_keyfile),
         ssl_certfile=str(ssl_certfile),
         reload=True
