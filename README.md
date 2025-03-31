@@ -4,16 +4,18 @@ Welcome to OpenFactoryAssistant!
 
 OpenFactoryAssistant is an open-source factory management solution aimed at manufacturers who want to explore digital transformation but who want to avoid significant investment until they have more confidence in what digital tools can do for them.
 
+**NOTE: OpenFactoryAssistant is a work in progress. Feedback on features, user experience etc. is very welcome!**
+
 ## Features
 
-OpenFactoryAssistant has been built to help you take your first steps into digital transformation:
+OpenFactoryAssistant has been built to help you take your first steps into digital transformation. At the moment, job tracking is the primary feature available, but there is a lot planned for the future!
 
 ### Core Features
 
 - **Job Tracking**: Monitor jobs as they move through your factory
 - **QR Code Integration**: Easily scan and update job locations using QR codes via the browser on your mobile device
 - **Multi-Station Management**: Define and manage multiple work stations
-- **Pre-made Information Views**: Get live insights into your factory's operations with several pre-made data visualisations
+- **Pre-made Information Views**: Put up data visualisations on office screens to easily identify bottlenecks, free capacity and more.
 
 ## Deployment Guide
 
@@ -37,11 +39,11 @@ cd certs
 mkcert localhost
 ```
 
-You don't need to use mkcert. Just make sure you have the key and cert files in the `certs` folder.
+You don't need to use mkcert (it is an easy option though). Just make sure you have the key and cert files in the `certs` folder.
 
 ### Browser Compatibility
 
-For the best development experience:
+OpenFactoryAssistant is at an early stage so, for the best experience:
 
 - **Recommended Browser**: Google Chrome is the recommended browser for development and testing
 - **Other Browsers**: Firefox and Safari may have issues with self-signed certificates in development
@@ -56,7 +58,7 @@ We provide both automated and manual setup options. Choose the one that suits yo
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/yourusername/open-factory-assistant.git
+   git clone https://github.com/darius-all-new/open-factory-assistant.git
    cd open-factory-assistant
    ```
 
@@ -75,14 +77,23 @@ We provide both automated and manual setup options. Choose the one that suits yo
    .\install\setup_windows.ps1
    ```
 
+   **For Raspberry Pi users:**
+
+   ```bash
+   chmod +x install/setup_raspbian.sh
+   ./install/setup_raspbian.sh
+   ```
+
    The setup script will:
 
-   - Create necessary environment files
+   - Create necessary environment files (.env)
    - Check Python and Node.js installations
    - Set up a Python virtual environment
    - Install Python requirements
    - Install npm dependencies
    - Configure environment variables
+   - Launch the services (backend, frontend, and scanner)
+   - Create a user (optional)
 
 #### Manual Setup
 
@@ -93,15 +104,15 @@ If you prefer manual setup, follow the steps below:
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/yourusername/open-factory-assistant.git
+   git clone https://github.com/darius-all-new/open-factory-assistant.git
    cd open-factory-assistant
    ```
 
-2. Set up Python virtual environment (called "venv"):
+2. Set up Python virtual environment (called "ofa"):
 
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   python -m venv ofa
+   source ofa/bin/activate  # On Windows: ofa\Scripts\activate
    pip install -r requirements.txt
    ```
 
@@ -131,7 +142,7 @@ cp .env.example .env
 2. Install dependencies:
 
    ```bash
-   npm install
+   npm install # On Windows you may need to run: npm install --force
    ```
 
 3. Configure environment:
@@ -143,7 +154,7 @@ cp .env.example .env
 
 4. Start the development server:
    ```bash
-   npm run dev
+   npm run dev # On Windows: npm run dev:host
    ```
 
 ### Scanner Setup
@@ -157,25 +168,24 @@ cp .env.example .env
 2. Install dependencies:
 
    ```bash
-   npm install
+   npm install # On Windows you may need to run: npm install --force
    ```
 
 3. Configure the scanner:
 
    ```bash
-   cp config.example.json config.json
-   # Edit config.json with your settings
-   # Make sure to set HTTPS=true and update SSL certificate paths
+   cp .env.example .env
+   # Edit .env with your configuration
    ```
 
 4. Start the scanner application:
    ```bash
-   npm start
+   npm run dev # On Windows: npm run dev:host
    ```
 
 ### Enabling Mobile Device Access (Windows)
 
-To access the scanner from mobile devices on your local network:
+To make sure OpenFactoryAssistant is accessible on your local network:
 
 1. **Configure Network Profile**
 
@@ -214,37 +224,6 @@ To access the scanner from mobile devices on your local network:
    - Replace `<windows-pc-ip>` with your Windows PC's local IP address
    - Accept the security certificate warning on first access (development only)
 
-Note: These steps are for development environments only. For production deployments, proper security measures should be implemented.
-
-## Configuration
-
-### Environment Variables
-
-[TODO: Add detailed list of all environment variables and their descriptions]
-
-### Security Configuration
-
-- CORS settings
-- Rate limiting parameters
-- Token expiration times
-- [TODO: Add more security configuration options]
-
 ## Documentation
 
-For detailed documentation, please visit our [Wiki](TODO: Add wiki link).
-
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guide](TODO: Add contributing guide) for details.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Support
-
-[TODO: Add support channels and contact information]
-
-## Acknowledgments
-
-[TODO: Add acknowledgments for contributors and third-party libraries]
+TODO: Detailed documentation
