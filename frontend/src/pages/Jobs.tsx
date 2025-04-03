@@ -47,6 +47,7 @@ import {
   alpha,
   Pagination,
   SelectChangeEvent,
+  ListItemIcon,
 } from "@mui/material";
 import Timeline from "@mui/lab/Timeline";
 import TimelineItem from "@mui/lab/TimelineItem";
@@ -78,6 +79,9 @@ import {
 import { Customer, getCustomers } from "../services/customers";
 import { getCurrentTime } from "../utils/time";
 import { convertJobsToCSV, downloadCSV } from "../utils/export";
+import { QRCodeSVG } from "qrcode.react";
+import PrintIcon from "@mui/icons-material/Print";
+import QrCodeIcon from "@mui/icons-material/QrCode";
 
 export default function Jobs() {
   const theme = useTheme();
@@ -107,6 +111,7 @@ export default function Jobs() {
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [jobsPerPage, setJobsPerPage] = useState(10);
+  const [isQRDialogOpen, setIsQRDialogOpen] = useState(false);
 
   const fetchJobHistory = async (jobId: number) => {
     if (!token) return;
@@ -283,6 +288,57 @@ export default function Jobs() {
     (currentPage - 1) * jobsPerPage,
     currentPage * jobsPerPage
   );
+
+  const handlePrintQRCode = () => {
+    const printContent = document.getElementById('qr-code');
+    if (printContent) {
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        const qrCodeClone = printContent.cloneNode(true) as HTMLElement;
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>Print Job QR Code</title>
+              <style>
+                body {
+                  display: flex;
+                  justify-content: center;
+                  align-items: center;
+                  min-height: 100vh;
+                  margin: 0;
+                  background: white;
+                }
+                .container {
+                  text-align: center;
+                  padding: 20px;
+                }
+                .job-id {
+                  margin-top: 16px;
+                  font-family: Arial, sans-serif;
+                  font-size: 14px;
+                }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                ${qrCodeClone.outerHTML}
+                <div class="job-id">Job ID: ${activeJobId}</div>
+              </div>
+            </body>
+          </html>
+        `);
+        
+        printWindow.document.close();
+        printWindow.focus();
+        
+        // Wait a moment for the content to load before printing
+        setTimeout(() => {
+          printWindow.print();
+          printWindow.close();
+        }, 250);
+      }
+    }
+  };
 
   return (
     <Box sx={{ p: 3 }}>
@@ -820,7 +876,57 @@ export default function Jobs() {
             </MenuItem>
           )
         )}
+        <MenuItem
+          onClick={() => {
+            setIsQRDialogOpen(true);
+            setMenuAnchorEl(null);
+          }}
+        >
+          <ListItemIcon>
+            <QrCodeIcon fontSize="small" />
+          </ListItemIcon>
+          Generate QR Code
+        </MenuItem>
       </Menu>
+
+      <Dialog
+        open={isQRDialogOpen}
+        onClose={() => setIsQRDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Job QR Code</DialogTitle>
+        <DialogContent>
+          <Box
+            id="qr-code"
+            sx={{
+              bgcolor: "white",
+              p: 2.5,
+              borderRadius: 1,
+              boxShadow: 1,
+              display: "flex",
+              justifyContent: "center",
+            }}
+          >
+            <QRCodeSVG
+              value={JSON.stringify({ job: activeJobId })}
+              size={256}
+              level="H"
+            />
+          </Box>
+          <Button
+            startIcon={<PrintIcon />}
+            variant="contained"
+            onClick={handlePrintQRCode}
+            sx={{ mt: 2, width: "100%" }}
+          >
+            Print QR Code
+          </Button>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIsQRDialogOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
